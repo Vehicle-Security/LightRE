@@ -1,0 +1,9 @@
+SCRIPT_PATH="$(readlink -f -- "${BASH_SOURCE[0]}")"
+CURRENT_DIR="$(cd -- "$(dirname -- "$SCRIPT_PATH")" && pwd)"
+PARENT_DIR="$(dirname -- "$CURRENT_DIR")"
+TOOLS_DIR="${TOOLS_DIR:-$CURRENT_DIR/tools}"
+RIZIN_HOME="${RIZIN_HOME:-$TOOLS_DIR/rizin}"
+GHIDRA_HOME="${GHIDRA_HOME:-$TOOLS_DIR/ghidra}"
+
+export CURRENT_DIR PARENT_DIR TOOLS_DIR RIZIN_HOME GHIDRA_HOME
+export PATH="$RIZIN_HOME/bin:$GHIDRA_HOME/support:$PATH"
