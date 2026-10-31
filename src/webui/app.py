@@ -5,6 +5,8 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 
+from candidates import read_candidate
+
 
 def create_app(reader):
     app = FastAPI(title="LightRE")
@@ -22,6 +24,21 @@ def create_app(reader):
     @app.get("/api/functions")
     def functions():
         return reader.catalog()
+
+    @app.get("/api/functions/{rva}/candidate")
+    def candidate(rva: str):
+        try:
+            address = int(rva, 0)
+        except ValueError as error:
+            raise HTTPException(400, "RVA 应为整数或 0x 开头的十六进制地址") from error
+        try:
+            return read_candidate(reader, address)
+        except KeyError as error:
+            raise HTTPException(404, str(error)) from error
+        except ValueError as error:
+            raise HTTPException(409, str(error)) from error
+        except OSError as error:
+            raise HTTPException(502, f"候选读取失败：{error}") from error
 
     @app.get("/api/functions/{rva}/assembly")
     def assembly(rva: str, offset: int = Query(0, ge=0), limit: int = Query(200, ge=1, le=200)):

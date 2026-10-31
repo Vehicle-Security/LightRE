@@ -8,6 +8,7 @@ TOOLS_DIR="$PROJECT_DIR/tools"
 RIZIN_HOME="$TOOLS_DIR/rizin"
 GHIDRA_HOME="$TOOLS_DIR/ghidra"
 GHIDRA_URL="${GHIDRA_URL:-}"
+INSTALL_GHIDRA=true
 
 die() {
   printf 'error: %s\n' "$*" >&2
@@ -43,7 +44,7 @@ has_build_dependencies() {
   for command_name in curl git python3 unzip meson ninja pkg-config; do
     command -v "$command_name" >/dev/null 2>&1 || return 1
   done
-  has_java21
+  ! "$INSTALL_GHIDRA" || has_java21
 }
 
 as_root() {
@@ -57,13 +58,17 @@ as_root() {
 }
 
 install_system_packages() {
+  local java_packages=()
+  if "$INSTALL_GHIDRA"; then
+    java_packages=(openjdk-21-jdk)
+  fi
   command -v apt-get >/dev/null 2>&1 || die "此脚本仅支持 Ubuntu 24.04。"
 
   log "安装 Ubuntu 24.04 依赖"
   as_root apt-get update
   as_root apt-get install -y \
     ca-certificates curl git python3 unzip \
-    openjdk-21-jdk \
+    "${java_packages[@]}" \
     build-essential meson ninja-build pkg-config \
     libcapstone-dev liblz4-dev libzip-dev libxxhash-dev \
     libmagic-dev libssl-dev libzstd-dev libtree-sitter-dev
@@ -160,24 +165,35 @@ install_ghidra() {
 }
 
 main() {
+  case "$*" in
+    "") ;;
+    --rizin-only) INSTALL_GHIDRA=false ;;
+    *) die "用法：bash scripts/install_deps.sh [--rizin-only]" ;;
+  esac
   cd -- "$PROJECT_DIR"
   mkdir -p "$TOOLS_DIR"
 
-  if has_rizin && has_ghidra && has_build_dependencies; then
-    log "Rizin、Ghidra Headless 及其依赖都已存在，跳过安装"
+  if has_rizin && { ! "$INSTALL_GHIDRA" || has_ghidra; } && has_build_dependencies; then
+    log "所需工具及其依赖都已存在，跳过安装"
     return 0
   fi
 
   install_system_packages
   install_rizin
-  install_ghidra
+  if "$INSTALL_GHIDRA"; then
+    install_ghidra
+  fi
 
   log "安装完成"
-  printf '\n请在 shell 中执行：\n'
-  printf '  source %q\n' "$PROJECT_DIR/set_env.sh"
+  if "$INSTALL_GHIDRA"; then
+    printf '\n请在 shell 中执行：\n'
+    printf '  source %q\n' "$PROJECT_DIR/set_env.sh"
+  fi
   printf '\n检查命令：\n'
   printf '  %q -v\n' "$RIZIN_HOME/bin/rizin"
-  printf '  %q\n' "$GHIDRA_HOME/support/analyzeHeadless"
+  if "$INSTALL_GHIDRA"; then
+    printf '  %q\n' "$GHIDRA_HOME/support/analyzeHeadless"
+  fi
 }
 
 main "$@"

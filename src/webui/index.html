@@ -85,10 +85,15 @@ h1{min-width:0;font:500 16px var(--mono);margin:0;overflow:hidden;text-overflow:
 .function-meta{font:11px var(--mono);color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 16px}
 .function-meta strong{color:var(--accent);font-weight:400}
 .code-tab{height:28px;display:flex;align-items:stretch;border-bottom:1px solid var(--line);padding:0 16px;justify-content:space-between;flex-shrink:0}
-.active-tab{display:flex;align-items:center;border-bottom:2px solid var(--accent);font-size:12px;gap:8px}
+.code-tabs{display:flex;align-items:stretch;gap:16px}
+.view-tab{display:flex;align-items:center;border:0;border-bottom:2px solid transparent;background:none;color:var(--muted);padding:0;font-size:12px;gap:8px}
+.view-tab[aria-selected=true]{border-bottom-color:var(--accent);color:var(--text)}
 .tab-icon{font:13px var(--mono);color:var(--accent)}
 .code-note{align-self:center;font-size:11px;color:var(--muted)}
 .code-scroll{overflow:auto;flex:1;position:relative}
+.candidate-meta{padding:8px 16px;border-bottom:1px solid var(--line);color:var(--muted);font:11px/18px var(--mono);overflow-wrap:anywhere}
+.candidate-meta strong{color:var(--error);font-weight:500}
+.candidate-code{margin:0;padding:12px 16px;font:12px/22px var(--mono);white-space:pre;tab-size:4}
 .code-head{position:sticky;top:0;z-index:1;background:var(--chrome);color:var(--muted);display:grid;grid-template-columns:112px 116px minmax(400px,1fr);font:10px var(--mono);padding:5px 16px;border-bottom:1px solid var(--line);letter-spacing:.8px;min-width:720px}
 .instruction{display:grid;grid-template-columns:112px 116px minmax(400px,1fr);font:12px/22px var(--mono);padding:0 16px;min-width:720px;white-space:pre}
 .instruction:hover{background:var(--hover)}
@@ -134,7 +139,7 @@ footer{height:22px;flex-shrink:0;display:flex;align-items:center;justify-content
 </head>
 <body>
 <header>
-  <div class="brand">Light<span>RE</span><span class="version">0.1</span></div>
+  <div class="brand">Light<span>RE</span><span class="version">0.2</span></div>
   <div class="sample"><div class="eyebrow">BINARY EXPLORER</div><div id="sample-name" class="sample-name">正在打开样本…</div></div>
   <div class="header-actions">
     <button id="theme-toggle" class="toolbar-button theme-toggle" aria-label="切换浅色或深色模式">
@@ -154,9 +159,12 @@ footer{height:22px;flex-shrink:0;display:flex;align-items:center;justify-content
   <div id="sidebar-resizer" class="sidebar-resizer" role="separator" aria-label="调整函数列表宽度" aria-orientation="vertical" aria-controls="sidebar" tabindex="0" title="拖动调整左栏宽度；双击恢复紧凑宽度；方向键微调"></div>
   <main>
     <div class="function-header"><h1 id="function-name">选择一个函数</h1><div class="function-meta"><span>RVA <strong id="function-rva">—</strong></span><span id="instruction-total">ARM64 · 原始汇编</span></div></div>
-    <div class="code-tab"><div class="active-tab"><span class="tab-icon">≡</span> 汇编</div><span class="code-note">已保存汇编 · 按地址排列 · 每段最多 200 条</span></div>
-    <div class="code-scroll" id="code-scroll"><div class="code-head"><span>RVA</span><span>BYTES</span><span>INSTRUCTION</span></div><div id="code"><div class="message">函数识别后将在这里显示原始 ARM64 汇编。</div></div></div>
-    <div class="pager"><span class="progress" id="progress" role="status">等待选择函数</span><button class="load-more" id="load-more" hidden>重试读取</button></div>
+    <div class="code-tab"><div class="code-tabs" role="tablist" aria-label="函数视图">
+      <button id="tab-assembly" class="view-tab" role="tab" aria-selected="true" aria-controls="code"><span class="tab-icon">≡</span> 汇编</button>
+      <button id="tab-candidate" class="view-tab" role="tab" aria-selected="false" aria-controls="candidate-panel">还原代码</button>
+    </div><span id="code-note" class="code-note">已保存汇编 · 按地址排列 · 每段最多 200 条</span></div>
+    <div class="code-scroll" id="code-scroll"><div id="assembly-head" class="code-head"><span>RVA</span><span>BYTES</span><span>INSTRUCTION</span></div><div id="code" role="tabpanel" aria-labelledby="tab-assembly"><div class="message">函数识别后将在这里显示原始 ARM64 汇编。</div></div><div id="candidate-panel" role="tabpanel" aria-labelledby="tab-candidate" hidden><div class="message">选择一个函数以查看还原候选。</div></div></div>
+    <div id="assembly-pager" class="pager"><span class="progress" id="progress" role="status">等待选择函数</span><button class="load-more" id="load-more" hidden>重试读取</button></div>
   </main>
 </div>
 <footer><span id="workspace" title="">外部分析工作区</span><span id="footer-state">ARM64 / RVA</span></footer>
@@ -166,6 +174,8 @@ const hex = n => '0x' + n.toString(16).padStart(8, '0');
 let functions = [], selected = null, loaded = 0, nextOffset = null, requestId = 0, controller, busy = false;
 let sampleState = 'new', refreshTimer, loadFailed = false;
 let sortBy = 'lines', sortDescending = true;
+let activeView = new URLSearchParams(location.search).get('view') === 'candidate' ? 'candidate' : 'assembly';
+let candidateController;
 const layout = document.querySelector('.layout'), resizer = $('sidebar-resizer');
 const minSidebarWidth = 220;
 const maxSidebarWidth = 400;
@@ -249,9 +259,53 @@ async function getJSON(url, signal) {
   return response.json();
 }
 
-function message(text, error = false) {
+function message(text, error = false, target = $('code')) {
   const el = document.createElement('div'); el.className = 'message' + (error ? ' error' : '');
-  el.textContent = text; $('code').replaceChildren(el); return el;
+  el.textContent = text; target.replaceChildren(el); return el;
+}
+
+function setView(view) {
+  activeView = view;
+  const assembly = view === 'assembly';
+  $('assembly-head').hidden = !assembly; $('code').hidden = !assembly;
+  $('assembly-pager').hidden = !assembly; $('candidate-panel').hidden = assembly;
+  $('tab-assembly').setAttribute('aria-selected', String(assembly));
+  $('tab-candidate').setAttribute('aria-selected', String(!assembly));
+  $('code-note').textContent = assembly ? '已保存汇编 · 按地址排列 · 每段最多 200 条' : '分析候选 · 未经执行验证';
+  $('footer-state').textContent = assembly ? 'ARM64 / RVA · 原始汇编' : 'ARM64 / RVA · 候选未验证';
+  const url = new URL(location.href);
+  if (assembly) url.searchParams.delete('view'); else url.searchParams.set('view', 'candidate');
+  history.replaceState(null, '', url);
+  $('code-scroll').scrollTop = 0;
+  if (selected) {
+    if (assembly) { if (!loaded) loadAssembly(); else loadNearBottom(); }
+    else loadCandidate();
+  }
+}
+
+async function loadCandidate() {
+  if (!selected) return;
+  candidateController?.abort();
+  const pending = new AbortController(); candidateController = pending;
+  const id = requestId;
+  message('正在读取还原候选…', false, $('candidate-panel'));
+  try {
+    const data = await getJSON(`/api/functions/${hex(selected.rva)}/candidate`, pending.signal);
+    if (id !== requestId || candidateController !== pending) return;
+    if (data.status === 'missing') {
+      message('尚未还原。让 Agent 分析并保存这个函数的候选后，刷新页面即可查看。', false, $('candidate-panel'));
+      return;
+    }
+    const meta = document.createElement('div'); meta.className = 'candidate-meta';
+    const status = document.createElement('strong'); status.textContent = '分析候选，未验证';
+    const path = document.createElement('div'); path.textContent = data.path;
+    meta.append(status, path);
+    const code = document.createElement('pre'); code.className = 'candidate-code'; code.textContent = data.code;
+    $('candidate-panel').replaceChildren(meta, code);
+  } catch (error) {
+    if (id !== requestId || candidateController !== pending || error.name === 'AbortError') return;
+    message(`候选读取失败：${error.message}。可点击“还原代码”重试。`, true, $('candidate-panel'));
+  }
 }
 
 function renderList() {
@@ -294,21 +348,22 @@ function renderInstruction(op) {
 }
 
 async function selectFunction(fn) {
-  controller?.abort(); requestId++; selected = fn; loaded = 0; nextOffset = 0; busy = false; loadFailed = false;
+  controller?.abort(); candidateController?.abort(); requestId++; selected = fn; loaded = 0; nextOffset = 0; busy = false; loadFailed = false;
   history.replaceState(null, '', '#' + hex(fn.rva));
   $('function-name').textContent = fn.name; $('function-rva').textContent = hex(fn.rva);
   $('instruction-total').textContent = `${fn.instructions.toLocaleString()} 条指令 · ARM64`;
   $('code-scroll').scrollTop = 0; renderList(); message('正在读取已保存的汇编…');
-  await loadAssembly();
+  if (activeView === 'assembly') await loadAssembly(); else await loadCandidate();
 }
 
 function loadNearBottom() {
+  if (activeView !== 'assembly') return;
   const scroll = $('code-scroll');
   if (!loadFailed && scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight <= 250) loadAssembly();
 }
 
 async function loadAssembly() {
-  if (!selected || nextOffset === null || busy) return;
+  if (activeView !== 'assembly' || !selected || nextOffset === null || busy) return;
   const id = requestId, offset = nextOffset; busy = true; loadFailed = false; controller = new AbortController();
   $('load-more').hidden = true;
   $('progress').textContent = offset ? '正在加载后续指令…' : '正在读取…';
@@ -355,11 +410,12 @@ async function refreshFunctions() {
       const updated = functions.find(f => f.rva === selected.rva);
       if (updated && (updated.instructions !== selected.instructions || updated.name !== selected.name)) selectFunction(updated);
     } else if (sample.state === 'ready') message('Rizin 未识别出函数。可以让 Agent 继续调查这个样本。');
-    $('footer-state').textContent = 'ARM64 / RVA · 原始汇编';
+    $('footer-state').textContent = activeView === 'assembly' ? 'ARM64 / RVA · 原始汇编' : 'ARM64 / RVA · 候选未验证';
     if (!['ready','error'].includes(sample.state)) refreshTimer = setTimeout(refreshFunctions, 1500);
   } catch (error) {
     $('footer-state').textContent = '连接失败，正在重试';
-    if (!selected) message(`无法读取函数列表：${error.message}`, true);
+    if (!selected) message(`无法读取函数列表：${error.message}`, true,
+      activeView === 'candidate' ? $('candidate-panel') : $('code'));
     refreshTimer = setTimeout(refreshFunctions, 3000);
   }
 }
@@ -368,9 +424,12 @@ $('sort-rva').onclick = () => setSort('rva');
 $('sort-lines').onclick = () => setSort('lines');
 $('clear').onclick = () => { $('search').value = ''; renderList(); $('search').focus(); };
 $('load-more').onclick = loadAssembly;
+$('tab-assembly').onclick = () => setView('assembly');
+$('tab-candidate').onclick = () => setView('candidate');
 $('code-scroll').addEventListener('scroll', loadNearBottom, {passive: true});
 window.addEventListener('resize', () => { setSidebarWidth(sidebarWidth); loadNearBottom(); });
 document.addEventListener('keydown', event => { if ((event.ctrlKey || event.metaKey) && event.key === 'k') { event.preventDefault(); $('search').focus(); } });
+setView(activeView);
 refreshFunctions();
 </script>
 </body>

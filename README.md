@@ -2,7 +2,7 @@
 
 ### LightRE
 
-LightRE 计划以 Agent Skill 为主要入口，用户向 Codex 描述目录和目标：
+LightRE 以 Agent Skill 为主要入口，用户向 Codex 描述目录和目标：
 
 ```text
 用 LightRE 打开 ../dg-samples/dC6BDAE，展示函数和汇编。
@@ -18,7 +18,7 @@ V0.1 以这句聊天作为启动入口：Agent 识别目标 SO、导出分析结
 
 Web 反馈后，Agent 继续按需调用 Rizin/Ghidra 和 unidbg，多轮分析、差分验证并更新结果。失败尝试和反例保留为 Evidence，未解决项及续做条件记入知识 Markdown，供新会话继续处理。
 
-当前 V0.1 已实现：独立分析导出、外部工作区，以及只读 Web 的函数搜索、LINES 排序、浅色/深色、滚动自动加载和紧凑布局。左栏可在 220–400px 范围拖动调宽，三列随宽度调整，LINES 居中。让 Agent 读取本项目的 [SKILL.md](SKILL.md) 并打开目标即可，无需全局安装。本轮人工验收反馈与样本记录见 [V0.1 milestone](docs/milestones/v0.1/DELIVERY.md)。
+V0.1 已实现：独立分析导出、外部工作区，以及只读 Web 的函数搜索、LINES 排序、浅色/深色、滚动自动加载和紧凑布局。左栏可在 220–400px 范围拖动调宽，三列随宽度调整，LINES 居中。让 Agent 读取本项目的 [SKILL.md](SKILL.md) 并打开目标即可，无需全局安装。本轮人工验收反馈与样本记录见 [V0.1 milestone](docs/milestones/v0.1/DELIVERY.md)。
 
 ```text
 读取 /work2/LightRE/SKILL.md，打开 /work2/dg-samples/dC6BDAE，展示函数和汇编。
@@ -26,7 +26,9 @@ Web 反馈后，Agent 继续按需调用 Rizin/Ghidra 和 unidbg，多轮分析�
 
 用法与本地 API 见 [V0.1 使用说明](docs/milestones/v0.1/USAGE.md)。动态分析和 LLM 还原留待后续小步实现。
 
-下一步已确认 [V0.2：单函数还原候选展示](docs/milestones/v0.2/PLAN.md)，目前仅记录计划，尚未实现。
+当前 [V0.2：单函数还原候选展示](docs/milestones/v0.2/DELIVERY.md)已实现，等待人工验收。Agent 将候选 C 代码保存在当前 SO 的分析目录，Web 的“还原代码”页签直接读取同一份文件，标明未验证；没有候选的函数仍可浏览汇编。
+
+新电脑 clone 后可直接把 [minilua_start.md](tests/minilua_start.md) 交给 Agent：仓库内置 ARM64 minilua 和 `0x23314` 的 15 指令候选示例，无需旧机器的 workspace 或 dg-samples。依赖准备、候选 API 和人工修改方式见 [V0.2 使用说明](docs/milestones/v0.2/USAGE.md)。
 
 代码与文档按职责放置：`src/analyzers/rizin.py` 负责分析导出，`src/workspace.py` 提供工作区及持久结果读取，`src/webui/` 只展示结果。阶段使用说明与交付记录放在 `docs/milestones/<版本>/`；长期设计、需求和实现计划保留在 `docs/`。
 

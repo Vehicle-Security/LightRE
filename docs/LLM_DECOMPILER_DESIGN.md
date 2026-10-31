@@ -19,9 +19,11 @@
 
 “SO 版本”指内容不同的原始文件；“源码版本”指对同一 SO 的某个还原结果的多次修改。不同 SO 的同一 RVA、源码 ID 或验证状态不合并。下文的路径和名字均为示例，不要求预先创建整棵目录。
 
-**当前提交基线为 V0.1，本轮人工验收反馈已落实。** 本版本先由分析入口调用 Rizin 保存函数和完整汇编，再让 Web 只读 workspace 和 SQLite；最终功能、界面与验证记录见 [V0.1 milestone](milestones/v0.1/DELIVERY.md)。后续范围见 [小步实现计划](IMPLEMENTATION_PLAN.md)，用法见 [V0.1 使用说明](milestones/v0.1/USAGE.md)。差分闭环是后续逐步达到的目标。
+**V0.1 基础版本的人工验收反馈已落实。** 本版本先由分析入口调用 Rizin 保存函数和完整汇编，再让 Web 只读 workspace 和 SQLite；最终功能、界面与验证记录见 [V0.1 milestone](milestones/v0.1/DELIVERY.md)。后续范围见 [小步实现计划](IMPLEMENTATION_PLAN.md)，用法见 [V0.1 使用说明](milestones/v0.1/USAGE.md)。差分闭环是后续逐步达到的目标。
 
 V0.1 每个 Web 进程固定浏览启动时指定的一份 SO 结果。更换目标由 Skill 重启服务，页面不提供工作区切换。
+
+当前 V0.2 在此基础上增加单函数候选文件的保存和只读展示，等待人工验收，见 [V0.2 交付记录](milestones/v0.2/DELIVERY.md)。这一小步只按原始函数 RVA 定位当前候选文件，尚不实现下文的完整源码索引、历史版本或动态验证。
 
 ## 目标与边界
 
