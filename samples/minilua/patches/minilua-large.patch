@@ -1,0 +1,11 @@
+--- minilua.c
++++ minilua.large.c
+@@ -5661,7 +5661,7 @@
+       Protect(Arith(L, ra, rb, rc, tm));                                                           \
+   }
+ 
+-static void luaV_execute(lua_State *L, int nexeccalls) {
++static __attribute__((noinline)) void luaV_execute(lua_State *L, int nexeccalls) {
+   LClosure *cl;
+   StkId base;
+   TValue *k;

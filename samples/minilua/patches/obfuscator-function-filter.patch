@@ -1,0 +1,40 @@
+--- a/flattening/Flattening.cpp
++++ b/flattening/Flattening.cpp
+@@ -12,6 +12,8 @@
+ //===----------------------------------------------------------------------===//
+ 
+ #include "Flattening.h"
++#include "llvm/ADT/SmallVector.h"
++#include <cstdlib>
+ #include "utils/Utils.h"
+ #include "llvm/Analysis/AssumptionCache.h"
+ #include "llvm/Analysis/LazyValueInfo.h"
+@@ -252,12 +254,26 @@
+ PreservedAnalyses FlatteningObfuscatorPass::run(Function &F,
+                                                 FunctionAnalysisManager &AM) {
+ 
++  // Explicit opt-in whitelist, before LowerSwitch: untouched functions must
++  // not be transformed even by the prerequisite switch lowering pass.
++  const char *names = std::getenv("LLVM_OBF_FUNCTIONS");
++  SmallVector<StringRef, 4> selected;
++  if (names)
++    StringRef(names).split(selected, ',', -1, false);
++  bool enabled = false;
++  for (StringRef name : selected)
++    enabled |= F.getName() == name;
++  if (!enabled)
++    return PreservedAnalyses::all();
++
+   PreservedAnalyses analysis = PreservedAnalyses::all();
+ 
+   analysis.intersect(LowerSwitchPass().run(F, AM));
+ 
+-  analysis.intersect(runFlattening(F) ? PreservedAnalyses::none()
+-                                      : PreservedAnalyses::all());
++  if (runFlattening(F)) {
++    errs() << "[flattening] " << F.getName() << "\n";
++    analysis.intersect(PreservedAnalyses::none());
++  }
+ 
+   return analysis;
+ }

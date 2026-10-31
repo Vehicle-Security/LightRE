@@ -1,1 +1,4 @@
 tools
+temp
+__pycache__/
+*.pyc

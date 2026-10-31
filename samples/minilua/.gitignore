@@ -1,0 +1,6 @@
+/.cache/
+/reference/
+/reports/
+/large/reference/
+/large/reports/
+__pycache__/

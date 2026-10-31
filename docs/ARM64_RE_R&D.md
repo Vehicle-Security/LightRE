@@ -336,37 +336,37 @@ breakpoint set --address 0x7abc1234
 最小工具组合是：
 
 ```text
-Rizin + 大模型 + Frida
+Rizin + LLM/Agent
 ```
 
-遇到复杂大型项目，再使用 Ghidra 或 Binary Ninja 建立更完整的类型和调用图。
+需要参考反编译时使用 Ghidra 或 Binary Ninja。LightRE 的动态实验以 unidbg/Qiling 等为主，不依赖 Frida/LLDB；本文此前的真实环境验证示例可作为通用知识阅读。
 
 ## 10. 全 Headless 二次开发和 LLM 集成
 
-如果目标不是偶尔手工分析，而是开发一套批量运行、完全无界面、结合大模型的分析系统，推荐优先使用 Ghidra Headless。
+LightRE 采用 LLM/Agent 主导、Rizin 优先、Ghidra Headless 按需的方式。具体设计和验收范围以 [设计文档](LLM_DECOMPILER_DESIGN.md) 和 [需求清单](REQUIREMENTS.md) 为准。
 
-### 工具分层
+### 工具职责
 
 ```text
-Rizin
-  └─ 快速扫描文件、函数、字符串和导入
+LLM/Agent
+  └─ 提出假设、选择工具、设计实验、去混淆和重写函数
 
-Ghidra Headless
-  └─ 深度反编译、CFG、类型、调用关系
+Rizin（默认静态入口）
+  └─ 读取函数、汇编、字符串和引用，按需深入分析
 
-JSON/数据库
-  └─ 保存函数级分析上下文
+Ghidra Headless（按需）
+  └─ 参考伪代码、P-Code、类型和控制流分析
 
-LLM
-  └─ 解释代码、命名变量、总结功能、提出验证假设
+unidbg/Qiling 等
+  └─ 执行实验，结合符号/强制执行恢复混淆逻辑
 
-Frida/LLDB
-  └─ 验证关键函数的运行时行为
+文件 + SQLite
+  └─ 保存函数版本、知识、证据和续做资料
 ```
 
 Ghidra 支持使用 `analyzeHeadless` 批量导入 `.so`、运行分析和执行脚本，不需要启动图形界面。脚本可以访问函数、指令、基本块、调用者、被调用者、字符串引用和数据类型；使用 `DecompInterface` 可以批量获得函数的 C-like 反编译结果。
 
-适合交给 LLM 的函数上下文可以保存为 JSON：
+适合交给 LLM 的函数资料可以按需输出为 JSON，下面仅为输出示例，无需额外持久化一份上下文数据库：
 
 ```json
 {
@@ -394,13 +394,13 @@ Ghidra 支持使用 `analyzeHeadless` 批量导入 `.so`、运行分析和执行
   "parameters": [],
   "return_value": "...",
   "side_effects": [],
-  "confidence": 0.78,
+  "evidence_ids": [],
   "uncertain_points": [],
   "dynamic_tests": []
 }
 ```
 
-### 为什么优先考虑 Ghidra Headless
+### Ghidra Headless 的适用场景
 
 - 免费，适合长期运行和部署；
 - 有完整的反编译、类型、CFG 和调用关系 API；
@@ -410,48 +410,47 @@ Ghidra 支持使用 `analyzeHeadless` 批量导入 `.so`、运行分析和执行
 
 Binary Ninja 的 Python API 和 IL 也很适合自动化，并且交互和分析速度通常很好。但如果完全不使用界面，且需要长期批量部署，应先确认商业授权范围。它的主要优势更多体现在交互体验和 API 易用性上。
 
-因此，比较实用的第一版架构是：
+LightRE 的最小分析闭环是：
 
 ```text
-Rizin 快速初筛
+Agent 选定函数和问题
     ↓
-Ghidra Headless 深度分析
+读取 Rizin 结果，按需调用 Ghidra 或执行实验
     ↓
-导出函数级 JSON
+根据证据重写并检查函数
     ↓
-LLM 生成结构化解释
-    ↓
-Frida/LLDB 验证关键结论
+保存文件和 SQLite，继续迭代，Web 展示结果
 ```
 
-如果只是分析少量简单函数，Rizin 加 LLM 就足够；如果要构建长期运行的全 Headless 分析系统，优先从 Ghidra Headless 开始。
+不要求先完成整个 SO 的 Ghidra 分析，也不要求每个函数都使用所有工具。已有结果直接读取，避免重复完整分析。
 
 ### 安装依赖
 
-项目中的 `install_deps.sh` 面向 Ubuntu 24.04 容器，会：
+项目中的 `scripts/install_deps.sh` 面向 Ubuntu 24.04 容器，会：
 
 - 安装 Java 21、Python、curl、unzip 等基础依赖；
 - 检查现有 Rizin；如果没有则从源码构建；
 - 从 Ghidra 官方 GitHub Release 下载最新公开发行版；
 - 将工具安装到项目的 `tools/` 目录；
-- 配置 `set_env.sh`，提供 `RIZIN_HOME`、`GHIDRA_HOME` 和 PATH。
+- 配合 `set_env.sh` 使用，后者只导出项目根目录变量 `PRJ_DIR`。
 
 执行：
 
 ```bash
-cd dg-fp-analysis
-./install_deps.sh
+cd LightRE
+./scripts/install_deps.sh
 source ./set_env.sh
 
-rizin -v
-"$GHIDRA_HOME/support/analyzeHeadless"
+"$PRJ_DIR/tools/rizin/bin/rizin" -v
+"$PRJ_DIR/tools/ghidra/support/analyzeHeadless"
 ```
 
-脚本默认需要联网，并可能需要 `sudo` 安装 Ubuntu 系统依赖。可以通过环境变量覆盖安装位置或 Ghidra 下载地址：
+`set_env.sh` 会自动调用 `scripts/install_deps.sh` 统一检查 Rizin、Ghidra Headless、Java 21 及其他依赖。所有依赖都存在时安装器会快速返回；只有缺少依赖时才会安装系统包、构建 Rizin 或下载 Ghidra。`set_env.sh` 只导出 `PRJ_DIR`，其值就是项目根目录。
+
+缺少依赖时脚本需要联网，并可能需要 `sudo` 安装 Ubuntu 系统依赖。工具安装在项目的 `tools/`，可通过环境变量覆盖 Ghidra 下载地址：
 
 ```bash
-TOOLS_DIR=/opt/re-tools ./install_deps.sh
-GHIDRA_URL=https://example.org/ghidra.zip ./install_deps.sh
+GHIDRA_URL=https://example.org/ghidra.zip ./scripts/install_deps.sh
 ```
 
 脚本支持重复执行：已经存在且可用的 Rizin 或 Ghidra 会被复用，不会重复下载。

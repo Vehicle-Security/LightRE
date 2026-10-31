@@ -1,0 +1,53 @@
+--- a/split/SplitBasicBlocks.cpp
++++ b/split/SplitBasicBlocks.cpp
+@@ -12,6 +12,8 @@
+ //===----------------------------------------------------------------------===//
+ 
+ #include "SplitBasicBlocks.h"
++#include "llvm/ADT/SmallVector.h"
++#include <cstdlib>
+ #include "utils/Utils.h"
+ #include "llvm/IR/PassManager.h"
+ #include "llvm/Passes/PassBuilder.h"
+@@ -55,6 +57,17 @@
+ }
+ 
+ bool SplitBasicBlock::runSplitBasicBlock(Function &F) {
++  // Match the flattening pass's exact opt-in function whitelist.
++  const char *names = std::getenv("LLVM_OBF_FUNCTIONS");
++  SmallVector<StringRef, 4> selected;
++  if (names)
++    StringRef(names).split(selected, ',', -1, false);
++  bool enabled = false;
++  for (StringRef name : selected)
++    enabled |= F.getName() == name;
++  if (!enabled)
++    return false;
++
+   // Check if the number of applications is correct
+   if (!((SplitNum > 1) && (SplitNum <= 10))) {
+     errs() << "Split application basic block percentage\
+@@ -67,6 +80,7 @@
+   // Do we obfuscate
+   if (toObfuscate(flag, tmp, "split")) {
+     split(tmp);
++    errs() << "[split] " << F.getName() << "\n";
+     ++Split;
+     return true;
+   }
+@@ -77,7 +91,6 @@
+ 
+ void SplitBasicBlock::split(Function *f) {
+   std::vector<BasicBlock *> origBB;
+-  int splitN = SplitNum;
+ 
+   // Save all basic blocks
+   for (Function::iterator I = f->begin(), IE = f->end(); I != IE; ++I) {
+@@ -88,6 +101,7 @@
+                                            IE = origBB.end();
+        I != IE; ++I) {
+     BasicBlock *curr = *I;
++    int splitN = SplitNum;
+ 
+     // No need to split a 1 inst bb
+     // Or ones containing a PHI node

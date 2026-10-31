@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LightRE · 函数浏览</title>
+<script>
+let savedTheme;
+try { savedTheme = localStorage.getItem('lightre-theme'); } catch {}
+document.documentElement.dataset.theme = savedTheme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+</script>
+<style>
+
+:root {
+  color-scheme:dark;
+  --bg:#111416;--panel:#171b1e;--chrome:#15191b;--line:#2a3034;
+  --text:#d7dddf;--muted:#859196;--accent:#b8e986;--input:#101416;
+  --hover:#22282b;--selected:#253026;--address:#859b91;--bytes:#77858c;
+  --mnemonic:#a3c9ef;--operand:#d1d6d9;--reg:#d6bd94;--number:#b8cc9b;
+  --error:#efab98;--button:#263322;--button-hover:#34482e;
+  --mono:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;
+}
+:root[data-theme=light] {
+  color-scheme:light;
+  --bg:#fff;--panel:#f5f7f8;--chrome:#f8fafb;--line:#dce2e6;
+  --text:#243039;--muted:#61717b;--accent:#367123;--input:#fff;
+  --hover:#eaf0f3;--selected:#e5f1df;--address:#45695c;--bytes:#6c7780;
+  --mnemonic:#21629d;--operand:#243039;--reg:#875c22;--number:#436b25;
+  --error:#b33b2c;--button:#e5f1df;--button-hover:#d6e8cd;
+}
+*{box-sizing:border-box}
+body{margin:0;height:100dvh;display:flex;flex-direction:column;background:var(--bg);color:var(--text);font:13px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+button,input{font:inherit}
+button{cursor:pointer}
+button:disabled{cursor:default;opacity:.5}
+button:focus-visible,input:focus-visible,a:focus-visible,.sidebar-resizer:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+header{height:44px;flex-shrink:0;display:flex;align-items:center;padding:0 16px;border-bottom:1px solid var(--line);gap:20px;background:var(--chrome)}
+.brand{font-size:20px;font-weight:650;letter-spacing:-.8px;white-space:nowrap}
+.brand span{color:var(--accent)}
+.version{font:10px var(--mono);color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:3px 5px;margin-left:8px;vertical-align:middle;letter-spacing:0}
+.sample{min-width:0;flex:1}
+.eyebrow{font-size:8px;letter-spacing:1.5px;color:var(--muted);margin-bottom:2px}
+.sample-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:550}
+.header-actions{display:flex;align-items:center;gap:8px}
+.toolbar-button{border:1px solid var(--line);background:var(--bg);color:var(--text);border-radius:5px;padding:7px 10px;font-size:11px;white-space:nowrap;display:flex;align-items:center;gap:7px}
+.toolbar-button:hover{background:var(--hover)}
+.toolbar-button svg{width:16px;height:16px;flex-shrink:0}
+.theme-toggle{padding:5px}
+.theme-toggle .sun{display:none}
+:root[data-theme=dark] .theme-toggle .sun{display:block}
+:root[data-theme=dark] .theme-toggle .moon{display:none}
+.layout{display:grid;grid-template-columns:var(--sidebar-width,240px) 5px minmax(0,1fr);flex:1;min-height:0}
+aside{background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;min-width:0}
+.sidebar-resizer{cursor:col-resize;touch-action:none;background:var(--chrome)}
+.sidebar-resizer:hover,.sidebar-resizer:focus-visible,.resizing .sidebar-resizer{background:var(--accent)}
+.resizing{user-select:none}
+.resizing *{cursor:col-resize!important}
+.sidebar-heading{padding:7px 10px 6px;display:flex;justify-content:space-between;align-items:center;font-weight:600}
+.count{font:11px var(--mono);color:var(--muted);font-weight:400}
+.search-wrap{padding:0 10px 6px;position:relative}
+.search-icon{position:absolute;left:21px;top:6px;color:var(--muted);pointer-events:none}
+input{width:100%;border:1px solid var(--line);border-radius:5px;background:var(--input);color:var(--text);padding:5px 30px;outline:none;font-size:12px}
+input:focus{border-color:var(--accent)}
+input::placeholder{color:var(--muted)}
+input::-webkit-search-cancel-button{appearance:none}
+.clear{position:absolute;right:17px;top:0;border:0;background:none;color:var(--muted);padding:3px 5px;font-size:17px}
+.columns,.function{display:grid;grid-template-columns:minmax(70px,1fr) minmax(0,1.4fr) minmax(44px,1fr);gap:4px;align-items:center}
+.columns{padding:5px 12px;border-block:1px solid var(--line);font:11px/17px var(--mono);color:var(--muted)}
+.column-sort{padding:0;border:0;background:none;color:var(--muted);text-align:left;font:inherit;white-space:nowrap}
+.column-sort:hover,.column-sort[aria-pressed=true]{color:var(--accent)}
+.column-sort:last-child{text-align:center}
+.functions{overflow-y:auto;flex:1;padding:4px 0;scrollbar-gutter:stable}
+.function{width:100%;border:0;border-left:2px solid transparent;background:transparent;text-align:left;color:var(--text);padding:4px 4px 4px 10px;font:11px/17px var(--mono)}
+.function:hover{background:var(--hover)}
+.function[aria-current=true]{background:var(--selected);border-left-color:var(--accent)}
+.function .addr{color:var(--address)}
+.function .name{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.function .lines{text-align:center;color:var(--number);font-variant-numeric:tabular-nums;white-space:nowrap}
+.function[aria-current=true] .addr,.function[aria-current=true] .lines{color:var(--accent)}
+.list-empty{padding:22px 12px;color:var(--muted);line-height:1.8}
+.sidebar-foot{border-top:1px solid var(--line);min-height:28px;padding:5px 10px;font-size:11px;line-height:17px;color:var(--muted)}
+main{display:flex;flex-direction:column;min-height:0;min-width:0}
+.function-header{min-height:40px;padding:8px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;flex-wrap:wrap;gap:4px 20px}
+h1{min-width:0;font:500 16px var(--mono);margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.function-meta{font:11px var(--mono);color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 16px}
+.function-meta strong{color:var(--accent);font-weight:400}
+.code-tab{height:28px;display:flex;align-items:stretch;border-bottom:1px solid var(--line);padding:0 16px;justify-content:space-between;flex-shrink:0}
+.active-tab{display:flex;align-items:center;border-bottom:2px solid var(--accent);font-size:12px;gap:8px}
+.tab-icon{font:13px var(--mono);color:var(--accent)}
+.code-note{align-self:center;font-size:11px;color:var(--muted)}
+.code-scroll{overflow:auto;flex:1;position:relative}
+.code-head{position:sticky;top:0;z-index:1;background:var(--chrome);color:var(--muted);display:grid;grid-template-columns:112px 116px minmax(400px,1fr);font:10px var(--mono);padding:5px 16px;border-bottom:1px solid var(--line);letter-spacing:.8px;min-width:720px}
+.instruction{display:grid;grid-template-columns:112px 116px minmax(400px,1fr);font:12px/22px var(--mono);padding:0 16px;min-width:720px;white-space:pre}
+.instruction:hover{background:var(--hover)}
+.instruction:first-child{margin-top:4px}
+.ins-address{color:var(--address)}
+.ins-bytes{color:var(--bytes)}
+.mnemonic{color:var(--mnemonic);display:inline-block;min-width:64px}
+.operand{color:var(--operand)}
+.reg{color:var(--reg)}
+.number{color:var(--number)}
+.message{padding:50px 24px;line-height:1.9;color:var(--muted)}
+.message.error{color:var(--error)}
+.pager{border-top:1px solid var(--line);min-height:28px;padding:4px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.progress{font:11px/17px var(--mono);color:var(--muted)}
+.load-more{border:1px solid var(--line);border-radius:5px;background:var(--button);color:var(--accent);padding:2px 8px;font-size:11px}
+.load-more:hover:enabled{background:var(--button-hover)}
+footer{height:22px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:18px;padding:0 10px;border-top:1px solid var(--line);background:var(--chrome);color:var(--muted);font:10px var(--mono)}
+#workspace{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#footer-state{flex-shrink:0}
+::selection{background:var(--selected);color:var(--text)}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:var(--line);border:2px solid var(--bg);border-radius:5px}
+::-webkit-scrollbar-track{background:transparent}
+[hidden]{display:none!important}
+@media(max-width:800px){
+  header{padding:0 12px;gap:14px}
+  .columns,.function{font-size:10px}
+  .code-note{display:none}
+}
+@media(max-width:520px){
+  .layout{--sidebar-width:220px}
+  .columns,.function{grid-template-columns:minmax(0,1fr) 44px}
+  .columns .name-label{display:none}
+  .function .addr{grid-column:1;grid-row:1}.function .lines{grid-column:2;grid-row:1}
+  .function .name{grid-column:1 / -1;grid-row:2}
+  .brand{font-size:18px}.version{display:none}.sample-name{font-size:12px}
+  .eyebrow{letter-spacing:.5px;font-size:8px}.toolbar-button{padding:5px;font-size:10px}
+  .header-actions{gap:5px}
+  h1{font-size:14px}.function-meta{gap:4px 8px}.pager{flex-wrap:wrap}.function-header{align-items:flex-start}
+  .count{font-size:10px}input{font-size:10px}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">Light<span>RE</span><span class="version">0.1</span></div>
+  <div class="sample"><div class="eyebrow">BINARY EXPLORER</div><div id="sample-name" class="sample-name">正在打开样本…</div></div>
+  <div class="header-actions">
+    <button id="theme-toggle" class="toolbar-button theme-toggle" aria-label="切换浅色或深色模式">
+      <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg>
+      <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M20 14.3A8.5 8.5 0 0 1 9.7 4a8.5 8.5 0 1 0 10.3 10.3Z"/></svg>
+    </button>
+  </div>
+</header>
+<div class="layout">
+  <aside id="sidebar" aria-label="函数导航">
+    <div class="sidebar-heading"><span>函数</span><span id="function-count" class="count">— 已识别</span></div>
+    <div class="search-wrap"><span class="search-icon" aria-hidden="true">⌕</span><input id="search" type="search" placeholder="搜索名称或 RVA" aria-label="搜索函数名称或十六进制 RVA" autocomplete="off" spellcheck="false"><button class="clear" id="clear" title="清空搜索" aria-label="清空搜索" hidden>×</button></div>
+    <div class="columns"><button class="column-sort" id="sort-rva" aria-label="按 RVA 排序" aria-pressed="false">RVA</button><span class="name-label">NAME</span><button class="column-sort" id="sort-lines" title="LINES：汇编指令行数，点击切换排序" aria-label="按汇编行数排序" aria-pressed="true">LINES ↓</button></div>
+    <nav class="functions" id="functions" aria-label="已识别函数"><div class="list-empty">正在读取已保存的函数…</div></nav>
+    <div class="sidebar-foot" id="list-summary">读取工作区分析结果</div>
+  </aside>
+  <div id="sidebar-resizer" class="sidebar-resizer" role="separator" aria-label="调整函数列表宽度" aria-orientation="vertical" aria-controls="sidebar" tabindex="0" title="拖动调整左栏宽度；双击恢复紧凑宽度；方向键微调"></div>
+  <main>
+    <div class="function-header"><h1 id="function-name">选择一个函数</h1><div class="function-meta"><span>RVA <strong id="function-rva">—</strong></span><span id="instruction-total">ARM64 · 原始汇编</span></div></div>
+    <div class="code-tab"><div class="active-tab"><span class="tab-icon">≡</span> 汇编</div><span class="code-note">已保存汇编 · 按地址排列 · 每段最多 200 条</span></div>
+    <div class="code-scroll" id="code-scroll"><div class="code-head"><span>RVA</span><span>BYTES</span><span>INSTRUCTION</span></div><div id="code"><div class="message">函数识别后将在这里显示原始 ARM64 汇编。</div></div></div>
+    <div class="pager"><span class="progress" id="progress" role="status">等待选择函数</span><button class="load-more" id="load-more" hidden>重试读取</button></div>
+  </main>
+</div>
+<footer><span id="workspace" title="">外部分析工作区</span><span id="footer-state">ARM64 / RVA</span></footer>
+<script>
+const $ = id => document.getElementById(id);
+const hex = n => '0x' + n.toString(16).padStart(8, '0');
+let functions = [], selected = null, loaded = 0, nextOffset = null, requestId = 0, controller, busy = false;
+let sampleState = 'new', refreshTimer, loadFailed = false;
+let sortBy = 'lines', sortDescending = true;
+const layout = document.querySelector('.layout'), resizer = $('sidebar-resizer');
+const minSidebarWidth = 220;
+const maxSidebarWidth = 400;
+let sidebarWidth = 240, dragStart = null;
+try { sidebarWidth = Number(localStorage.getItem('lightre-sidebar-width')) || 240; } catch {}
+
+function setSidebarWidth(width) {
+  const maxWidth = Math.max(minSidebarWidth, Math.min(maxSidebarWidth, layout.clientWidth - 165));
+  sidebarWidth = Math.round(Math.max(minSidebarWidth, Math.min(maxWidth, width)));
+  layout.style.setProperty('--sidebar-width', sidebarWidth + 'px');
+  resizer.setAttribute('aria-valuemin', minSidebarWidth);
+  resizer.setAttribute('aria-valuemax', maxWidth);
+  resizer.setAttribute('aria-valuenow', sidebarWidth);
+}
+function saveSidebarWidth() {
+  try { localStorage.setItem('lightre-sidebar-width', String(sidebarWidth)); } catch {}
+}
+resizer.onpointerdown = event => {
+  if (event.button !== 0) return;
+  event.preventDefault(); resizer.focus();
+  dragStart = {x: event.clientX, width: sidebarWidth};
+  resizer.setPointerCapture(event.pointerId);
+  document.body.classList.add('resizing');
+};
+resizer.onpointermove = event => {
+  if (dragStart) setSidebarWidth(dragStart.width + event.clientX - dragStart.x);
+};
+resizer.onlostpointercapture = () => {
+  dragStart = null; document.body.classList.remove('resizing');
+  saveSidebarWidth(); loadNearBottom();
+};
+resizer.ondblclick = () => {
+  setSidebarWidth(240); saveSidebarWidth(); loadNearBottom();
+};
+resizer.onkeydown = event => {
+  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+  event.preventDefault();
+  setSidebarWidth(event.key === 'Home' ? minSidebarWidth : event.key === 'End' ? maxSidebarWidth :
+    sidebarWidth + (event.key === 'ArrowLeft' ? -10 : 10));
+  saveSidebarWidth(); loadNearBottom();
+};
+setSidebarWidth(sidebarWidth);
+
+function updateThemeButton() {
+  const next = document.documentElement.dataset.theme === 'light' ? '深色' : '浅色';
+  $('theme-toggle').title = `切换到${next}模式`;
+  $('theme-toggle').setAttribute('aria-label', `切换到${next}模式`);
+}
+$('theme-toggle').onclick = () => {
+  const theme = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+  document.documentElement.dataset.theme = theme;
+  try { localStorage.setItem('lightre-theme', theme); } catch {}
+  updateThemeButton();
+};
+updateThemeButton();
+
+function compareFunctions(a, b) {
+  const difference = sortBy === 'lines' ? a.instructions - b.instructions : a.rva - b.rva;
+  return (sortDescending ? -difference : difference) || a.rva - b.rva;
+}
+
+function setSort(key) {
+  sortDescending = sortBy === key ? !sortDescending : key === 'lines';
+  sortBy = key;
+  for (const column of ['rva', 'lines']) {
+    const button = $('sort-' + column), active = column === sortBy;
+    button.textContent = (column === 'rva' ? 'RVA' : 'LINES') + (active ? sortDescending ? ' ↓' : ' ↑' : '');
+    button.setAttribute('aria-pressed', String(active));
+  }
+  renderList();
+  $('functions').scrollTop = 0;
+}
+
+async function getJSON(url, signal) {
+  const response = await fetch(url, {signal});
+  if (!response.ok) {
+    let message = `HTTP ${response.status}`;
+    try { const body = await response.json(); message = typeof body.detail === 'string' ? body.detail : message; } catch {}
+    throw new Error(message);
+  }
+  return response.json();
+}
+
+function message(text, error = false) {
+  const el = document.createElement('div'); el.className = 'message' + (error ? ' error' : '');
+  el.textContent = text; $('code').replaceChildren(el); return el;
+}
+
+function renderList() {
+  const query = $('search').value.trim().toLowerCase();
+  const addressQuery = query.replace(/^0x/, '').replace(/^0+/, '') || '0';
+  const visible = functions.filter(f => !query || f.name.toLowerCase().includes(query) ||
+    hex(f.rva).includes(query) || f.rva.toString(16).includes(addressQuery)).sort(compareFunctions);
+  $('clear').hidden = !query;
+  const fragment = document.createDocumentFragment();
+  for (const fn of visible) {
+    const row = document.createElement('button'); row.className = 'function'; row.dataset.rva = fn.rva;
+    row.setAttribute('aria-current', String(selected?.rva === fn.rva)); row.title = `${fn.name} · ${hex(fn.rva)} · ${fn.instructions.toLocaleString()} 行汇编`;
+    const address = document.createElement('span'); address.className = 'addr'; address.textContent = hex(fn.rva);
+    const name = document.createElement('span'); name.className = 'name'; name.textContent = fn.name;
+    const lines = document.createElement('span'); lines.className = 'lines'; lines.textContent = fn.instructions.toLocaleString();
+    row.append(address, name, lines); row.onclick = () => selectFunction(fn); fragment.append(row);
+  }
+  if (!visible.length) {
+    const empty = document.createElement('div'); empty.className = 'list-empty';
+    empty.textContent = query ? '没有匹配的函数。试试名称片段或十六进制 RVA。' : sampleState === 'ready' ? '当前没有已保存的函数。' : '正在读取函数…'; fragment.append(empty);
+  }
+  $('functions').replaceChildren(fragment);
+  $('list-summary').textContent = query ? `${visible.length} / ${functions.length} 个匹配` :
+    `按${sortBy === 'lines' ? '行数' : ' RVA '}${sortDescending ? '降序' : '升序'} · 每条指令计一行`;
+}
+
+function renderInstruction(op) {
+  const row = document.createElement('div'); row.className = 'instruction'; row.dataset.rva = op.rva;
+  const addr = document.createElement('span'); addr.className = 'ins-address'; addr.textContent = hex(op.rva);
+  const bytes = document.createElement('span'); bytes.className = 'ins-bytes'; bytes.textContent = op.bytes;
+  const code = document.createElement('span');
+  const split = op.opcode.indexOf(' '), mnemonic = split < 0 ? op.opcode : op.opcode.slice(0, split);
+  const m = document.createElement('span'); m.className = 'mnemonic'; m.textContent = mnemonic; code.append(m);
+  const operands = split < 0 ? '' : op.opcode.slice(split + 1);
+  for (const token of operands.split(/(\b(?:[xwvsdqbh]\d+|sp|wsp|xzr|wzr|lr|fp)\b|\b0x[\da-f]+\b|\b\d+\b)/gi)) {
+    const part = document.createElement('span'); part.textContent = token;
+    part.className = /^(?:[xwvsdqbh]\d+|sp|wsp|xzr|wzr|lr|fp)$/i.test(token) ? 'reg' : /^(?:0x[\da-f]+|\d+)$/i.test(token) ? 'number' : 'operand'; code.append(part);
+  }
+  row.append(addr, bytes, code); return row;
+}
+
+async function selectFunction(fn) {
+  controller?.abort(); requestId++; selected = fn; loaded = 0; nextOffset = 0; busy = false; loadFailed = false;
+  history.replaceState(null, '', '#' + hex(fn.rva));
+  $('function-name').textContent = fn.name; $('function-rva').textContent = hex(fn.rva);
+  $('instruction-total').textContent = `${fn.instructions.toLocaleString()} 条指令 · ARM64`;
+  $('code-scroll').scrollTop = 0; renderList(); message('正在读取已保存的汇编…');
+  await loadAssembly();
+}
+
+function loadNearBottom() {
+  const scroll = $('code-scroll');
+  if (!loadFailed && scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight <= 250) loadAssembly();
+}
+
+async function loadAssembly() {
+  if (!selected || nextOffset === null || busy) return;
+  const id = requestId, offset = nextOffset; busy = true; loadFailed = false; controller = new AbortController();
+  $('load-more').hidden = true;
+  $('progress').textContent = offset ? '正在加载后续指令…' : '正在读取…';
+  try {
+    const page = await getJSON(`/api/functions/${hex(selected.rva)}/assembly?offset=${offset}`, controller.signal);
+    if (id !== requestId) return;
+    if (!offset) $('code').replaceChildren();
+    const fragment = document.createDocumentFragment(); page.instructions.forEach(op => fragment.append(renderInstruction(op)));
+    $('code').append(fragment); loaded += page.instructions.length; nextOffset = page.next_offset;
+    if (!loaded) message('这个已识别函数没有可读取的指令。');
+    $('progress').textContent = `已显示 ${loaded.toLocaleString()} / ${page.total.toLocaleString()} 条指令 · ` +
+      (nextOffset === null ? '已全部加载' : '向下滚动自动加载');
+  } catch (error) {
+    if (id !== requestId || error.name === 'AbortError') return;
+    loadFailed = true;
+    if (!offset) message(error.message, true);
+    $('progress').textContent = offset ? `后续读取失败：${error.message}` : '读取失败，可重试或选择其他函数';
+    $('load-more').hidden = false;
+  } finally {
+    if (id === requestId) {
+      busy = false;
+      if (!loadFailed) requestAnimationFrame(loadNearBottom);
+    }
+  }
+}
+
+async function refreshFunctions() {
+  clearTimeout(refreshTimer);
+  try {
+    const data = await getJSON('/api/functions'); functions = data.functions;
+    const sample = data.sample; sampleState = sample.state;
+    $('sample-name').textContent = sample.name; $('sample-name').title = sample.source_path;
+    document.title = `${sample.name} · LightRE`;
+    $('workspace').textContent = sample.directory; $('workspace').title = sample.directory;
+    $('function-count').textContent = `${functions.length} 已识别`;
+    if (sample.error) {
+      if (!selected) message(sample.error, true);
+    }
+    renderList();
+    if (functions.length && (!selected || !functions.some(f => f.rva === selected.rva))) {
+      const anchor = Number.parseInt(location.hash.slice(1), 16);
+      selectFunction(functions.find(f => f.rva === anchor) || [...functions].sort(compareFunctions)[0]);
+    } else if (selected) {
+      const updated = functions.find(f => f.rva === selected.rva);
+      if (updated && (updated.instructions !== selected.instructions || updated.name !== selected.name)) selectFunction(updated);
+    } else if (sample.state === 'ready') message('Rizin 未识别出函数。可以让 Agent 继续调查这个样本。');
+    $('footer-state').textContent = 'ARM64 / RVA · 原始汇编';
+    if (!['ready','error'].includes(sample.state)) refreshTimer = setTimeout(refreshFunctions, 1500);
+  } catch (error) {
+    $('footer-state').textContent = '连接失败，正在重试';
+    if (!selected) message(`无法读取函数列表：${error.message}`, true);
+    refreshTimer = setTimeout(refreshFunctions, 3000);
+  }
+}
+$('search').addEventListener('input', renderList);
+$('sort-rva').onclick = () => setSort('rva');
+$('sort-lines').onclick = () => setSort('lines');
+$('clear').onclick = () => { $('search').value = ''; renderList(); $('search').focus(); };
+$('load-more').onclick = loadAssembly;
+$('code-scroll').addEventListener('scroll', loadNearBottom, {passive: true});
+window.addEventListener('resize', () => { setSidebarWidth(sidebarWidth); loadNearBottom(); });
+document.addEventListener('keydown', event => { if ((event.ctrlKey || event.metaKey) && event.key === 'k') { event.preventDefault(); $('search').focus(); } });
+refreshFunctions();
+</script>
+</body>
+</html>

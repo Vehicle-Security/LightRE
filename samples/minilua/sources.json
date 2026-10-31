@@ -1,0 +1,21 @@
+{
+  "minilua": {
+    "repository": "https://github.com/LuaJIT/LuaJIT",
+    "commit": "ea9eb7edb5eac4a9d175d74523db34fac0fa5180",
+    "url": "https://raw.githubusercontent.com/LuaJIT/LuaJIT/ea9eb7edb5eac4a9d175d74523db34fac0fa5180/src/host/minilua.c",
+    "sha256": "339c4f324da933ed2fe7439896af7ec6ccb8f159686f972cdb53a240cfd17fc3"
+  },
+  "obfuscator": {
+    "repository": "https://github.com/eshard/obfuscator-llvm.git",
+    "commit": "be910da9267b40cbe6ae8c946eb2ef008f6e55f4",
+    "llvm_version": "14.0.6"
+  },
+  "targets": ["luaH_get", "luaH_set"],
+  "seed": "0xA04252B187478C00A40BC6D81D1A8A52",
+  "large": {
+    "optimization": "Os",
+    "split_num": 5,
+    "flatten_rounds": 2,
+    "minimum_instructions": 40000
+  }
+}

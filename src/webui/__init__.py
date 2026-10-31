@@ -1,0 +1,1 @@
+"""LightRE's web interface."""

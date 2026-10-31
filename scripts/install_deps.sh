@@ -2,11 +2,11 @@
 
 set -Eeuo pipefail
 
-SCRIPT_PATH="$(readlink -f -- "${BASH_SOURCE[0]}")"
-SCRIPT_DIR="$(cd -- "$(dirname -- "$SCRIPT_PATH")" && pwd)"
-TOOLS_DIR="${TOOLS_DIR:-$SCRIPT_DIR/tools}"
-RIZIN_HOME="${RIZIN_HOME:-$TOOLS_DIR/rizin}"
-GHIDRA_HOME="${GHIDRA_HOME:-$TOOLS_DIR/ghidra}"
+SCRIPT_DIR="$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")"
+PROJECT_DIR="$(dirname -- "$SCRIPT_DIR")"
+TOOLS_DIR="$PROJECT_DIR/tools"
+RIZIN_HOME="$TOOLS_DIR/rizin"
+GHIDRA_HOME="$TOOLS_DIR/ghidra"
 GHIDRA_URL="${GHIDRA_URL:-}"
 
 die() {
@@ -16,6 +16,34 @@ die() {
 
 log() {
   printf '[install_deps] %s\n' "$*"
+}
+
+has_rizin() {
+  command -v rizin >/dev/null 2>&1 || {
+    [[ -x "$RIZIN_HOME/bin/rizin" ]] &&
+      [[ -d "$("$RIZIN_HOME/bin/rizin" -H RZ_PREFIX)" ]]
+  }
+}
+
+has_ghidra() {
+  [[ -x "$GHIDRA_HOME/support/analyzeHeadless" ]]
+}
+
+has_java21() {
+  local major
+
+  command -v java >/dev/null 2>&1 || return 1
+  major="$(java -version 2>&1 | sed -n 's/.*version "\([0-9][0-9]*\).*/\1/p' | head -n 1)"
+  [[ "$major" =~ ^[0-9]+$ ]] && (( major >= 21 ))
+}
+
+has_build_dependencies() {
+  local command_name
+
+  for command_name in curl git python3 unzip meson ninja pkg-config; do
+    command -v "$command_name" >/dev/null 2>&1 || return 1
+  done
+  has_java21
 }
 
 as_root() {
@@ -43,7 +71,7 @@ install_system_packages() {
 
 build_rizin_from_source() {
   local source_dir="$TOOLS_DIR/src/rizin"
-  local build_dir="$source_dir/build"
+  local build_dir="$source_dir/build-lightre"
 
   log "系统包中没有 Rizin，改为从源码构建"
   mkdir -p "$TOOLS_DIR/src"
@@ -53,21 +81,21 @@ build_rizin_from_source() {
   fi
 
   if [[ -f "$build_dir/meson-private/coredata.dat" ]]; then
-    meson setup --reconfigure "$build_dir" "$source_dir" --prefix="$RIZIN_HOME" --buildtype=release
+    meson setup --reconfigure "$build_dir" "$source_dir" --prefix="$RIZIN_HOME" --buildtype=release -Dportable=true
   else
-    meson setup "$build_dir" "$source_dir" --prefix="$RIZIN_HOME" --buildtype=release
+    meson setup "$build_dir" "$source_dir" --prefix="$RIZIN_HOME" --buildtype=release -Dportable=true
   fi
   meson compile -C "$build_dir"
   meson install -C "$build_dir"
 }
 
 install_rizin() {
-  if command -v rizin >/dev/null 2>&1; then
-    log "Rizin 已存在：$(command -v rizin)"
-    return
-  fi
-  if [[ -x "$RIZIN_HOME/bin/rizin" ]]; then
-    log "Rizin 已存在：$RIZIN_HOME/bin/rizin"
+  if has_rizin; then
+    if command -v rizin >/dev/null 2>&1; then
+      log "Rizin 已存在：$(command -v rizin)"
+    else
+      log "Rizin 已存在：$RIZIN_HOME/bin/rizin"
+    fi
     return
   fi
 
@@ -99,7 +127,7 @@ else:
 install_ghidra() {
   local url archive temp_dir extracted_dir
 
-  if [[ -x "$GHIDRA_HOME/support/analyzeHeadless" ]]; then
+  if has_ghidra; then
     log "Ghidra Headless 已存在：$GHIDRA_HOME"
     return
   fi
@@ -123,7 +151,7 @@ install_ghidra() {
   [[ -n "$extracted_dir" ]] || die "无法从 Ghidra 归档中找到安装目录"
 
   if [[ -e "$GHIDRA_HOME" ]]; then
-    die "$GHIDRA_HOME 已存在但不是可用的 Ghidra 安装；请设置 GHIDRA_HOME 或移走该目录后重试。"
+    die "$GHIDRA_HOME 已存在但不是可用的 Ghidra 安装；请检查或移走该目录后重试。"
   fi
   mv "$extracted_dir" "$GHIDRA_HOME"
   rm -rf "$temp_dir"
@@ -132,17 +160,23 @@ install_ghidra() {
 }
 
 main() {
-  cd -- "$SCRIPT_DIR"
+  cd -- "$PROJECT_DIR"
   mkdir -p "$TOOLS_DIR"
+
+  if has_rizin && has_ghidra && has_build_dependencies; then
+    log "Rizin、Ghidra Headless 及其依赖都已存在，跳过安装"
+    return 0
+  fi
+
   install_system_packages
   install_rizin
   install_ghidra
 
   log "安装完成"
   printf '\n请在 shell 中执行：\n'
-  printf '  source %q\n' "$SCRIPT_DIR/set_env.sh"
+  printf '  source %q\n' "$PROJECT_DIR/set_env.sh"
   printf '\n检查命令：\n'
-  printf '  rizin -v\n'
+  printf '  %q -v\n' "$RIZIN_HOME/bin/rizin"
   printf '  %q\n' "$GHIDRA_HOME/support/analyzeHeadless"
 }
 

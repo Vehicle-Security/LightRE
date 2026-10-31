@@ -1,0 +1,1190 @@
+{
+  "sources": {
+    "minilua": {
+      "repository": "https://github.com/LuaJIT/LuaJIT",
+      "commit": "ea9eb7edb5eac4a9d175d74523db34fac0fa5180",
+      "url": "https://raw.githubusercontent.com/LuaJIT/LuaJIT/ea9eb7edb5eac4a9d175d74523db34fac0fa5180/src/host/minilua.c",
+      "sha256": "339c4f324da933ed2fe7439896af7ec6ccb8f159686f972cdb53a240cfd17fc3"
+    },
+    "obfuscator": {
+      "repository": "https://github.com/eshard/obfuscator-llvm.git",
+      "commit": "be910da9267b40cbe6ae8c946eb2ef008f6e55f4",
+      "llvm_version": "14.0.6"
+    },
+    "targets": [
+      "luaH_get",
+      "luaH_set"
+    ],
+    "seed": "0xA04252B187478C00A40BC6D81D1A8A52",
+    "large": {
+      "optimization": "Os",
+      "split_num": 5,
+      "flatten_rounds": 2,
+      "minimum_instructions": 40000
+    }
+  },
+  "environment": {
+    "platform": "Linux-6.12.76-linuxkit-aarch64-with-glibc2.39",
+    "os_release": "PRETTY_NAME=\"Ubuntu 24.04.4 LTS\"\nNAME=\"Ubuntu\"\nVERSION_ID=\"24.04\"\nVERSION=\"24.04.4 LTS (Noble Numbat)\"\nVERSION_CODENAME=noble\nID=ubuntu\nID_LIKE=debian\nHOME_URL=\"https://www.ubuntu.com/\"\nSUPPORT_URL=\"https://help.ubuntu.com/\"\nBUG_REPORT_URL=\"https://bugs.launchpad.net/ubuntu/\"\nPRIVACY_POLICY_URL=\"https://www.ubuntu.com/legal/terms-and-policies/privacy-policy\"\nUBUNTU_CODENAME=noble\nLOGO=ubuntu-logo\n",
+    "tools": {
+      "clang": "Ubuntu clang version 14.0.6\nTarget: aarch64-unknown-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin",
+      "llvm": "Ubuntu LLVM version 14.0.6\n  Optimized build.\n  Default target: aarch64-unknown-linux-gnu\n  Host CPU: (unknown)\n\n  Registered Targets:\n    aarch64    - AArch64 (little endian)\n    aarch64_32 - AArch64 (little endian ILP32)\n    aarch64_be - AArch64 (big endian)\n    amdgcn     - AMD GCN GPUs\n    arm        - ARM\n    arm64      - ARM64 (little endian)\n    arm64_32   - ARM64 (little endian ILP32)\n    armeb      - ARM (big endian)\n    avr        - Atmel AVR Microcontroller\n    bpf        - BPF (host endian)\n    bpfeb      - BPF (big endian)\n    bpfel      - BPF (little endian)\n    hexagon    - Hexagon\n    lanai      - Lanai\n    m68k       - Motorola 68000 family\n    mips       - MIPS (32-bit big endian)\n    mips64     - MIPS (64-bit big endian)\n    mips64el   - MIPS (64-bit little endian)\n    mipsel     - MIPS (32-bit little endian)\n    msp430     - MSP430 [experimental]\n    nvptx      - NVIDIA PTX 32-bit\n    nvptx64    - NVIDIA PTX 64-bit\n    ppc32      - PowerPC 32\n    ppc32le    - PowerPC 32 LE\n    ppc64      - PowerPC 64\n    ppc64le    - PowerPC 64 LE\n    r600       - AMD GPUs HD2XXX-HD6XXX\n    riscv32    - 32-bit RISC-V\n    riscv64    - 64-bit RISC-V\n    sparc      - Sparc\n    sparcel    - Sparc LE\n    sparcv9    - Sparc V9\n    systemz    - SystemZ\n    thumb      - Thumb\n    thumbeb    - Thumb (big endian)\n    ve         - VE\n    wasm32     - WebAssembly 32-bit\n    wasm64     - WebAssembly 64-bit\n    x86        - 32-bit X86: Pentium-Pro and above\n    x86-64     - 64-bit X86: EM64T and AMD64\n    xcore      - XCore",
+      "linker": "GNU ld (GNU Binutils for Ubuntu) 2.42\nCopyright (C) 2024 Free Software Foundation, Inc.\nThis program is free software; you may redistribute it under the terms of\nthe GNU General Public License version 3 or (at your option) a later version.\nThis program has absolutely no warranty.",
+      "binutils": "GNU strip (GNU Binutils for Ubuntu) 2.42\nCopyright (C) 2024 Free Software Foundation, Inc.\nThis program is free software; you may redistribute it under the terms of\nthe GNU General Public License version 3 or (at your option) any later version.\nThis program has absolutely no warranty.",
+      "cmake": "cmake version 3.28.3\n\nCMake suite maintained and supported by Kitware (kitware.com/cmake).",
+      "python": "Python 3.12.3",
+      "libc_packages": "libc6:arm64\t2.39-0ubuntu8.9\nlibc6-dev:arm64\t2.39-0ubuntu8.9",
+      "qemu": "not used; executed on native AArch64 Linux"
+    }
+  },
+  "optimization": "O2",
+  "compile_flags": [
+    "--target=aarch64-linux-gnu",
+    "--gcc-toolchain=/usr",
+    "-O2",
+    "-fPIE",
+    "-ffunction-sections",
+    "-fdata-sections",
+    "-g0"
+  ],
+  "link_flags": [
+    "--target=aarch64-linux-gnu",
+    "--gcc-toolchain=/usr",
+    "-O2",
+    "-fPIE",
+    "-ffunction-sections",
+    "-fdata-sections",
+    "-g0",
+    "-pie",
+    "-Wl,--gc-sections",
+    "-Wl,--build-id=sha1"
+  ],
+  "runtime": {
+    "mode": "native",
+    "sysroot": "/",
+    "sysroot_source": "native libc6/libc6-dev packages",
+    "runner": []
+  },
+  "pass_stage": "explicit opt after clang -O2/-Os IR optimization, before llc -O2; no LTO",
+  "plugin_sha256": "ea21100ddf1ae70806c83cef28f33a63527dfd3901d2a3c03426a595ccd40f56",
+  "commands": [
+    {
+      "argv": [
+        "patch",
+        "--batch",
+        "/work2/LightRE/samples/minilua/.cache/minilua.c",
+        "-i",
+        "/work2/LightRE/samples/minilua/src/modifications.patch"
+      ],
+      "cwd": "/work2/LightRE/samples/minilua",
+      "environment": {}
+    },
+    {
+      "argv": [
+        "llvm-config-14",
+        "--version"
+      ],
+      "cwd": "/work2/LightRE/samples/minilua",
+      "environment": {}
+    },
+    {
+      "argv": [
+        "llvm-config-14",
+        "--targets-built"
+      ],
+      "cwd": "/work2/LightRE/samples/minilua",
+      "environment": {}
+    },
+    {
+      "argv": [
+        "git",
+        "restore",
+        "--",
+        "flattening/Flattening.cpp",
+        "split/SplitBasicBlocks.cpp"
+      ],
+      "cwd": "/work2/LightRE/samples/minilua/.cache/obfuscator-llvm",
+      "environment": {}
+    },
+    {
+      "argv": [
+        "git",
+        "checkout",
+        "--detach",
+        "be910da9267b40cbe6ae8c946eb2ef008f6e55f4"
+      ],
+      "cwd": "/work2/LightRE/samples/minilua/.cache/obfuscator-llvm",
+      "environment": {}
+    },
+    {
+      "argv": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/work2/LightRE/samples/minilua/.cache/obfuscator-llvm",
+      "environment": {}
+    },
+    {
+      "argv": [
+        "git",
+        "show",
+        "be910da9267b40cbe6ae8c946eb2ef008f6e55f4:flattening/Flattening.cpp"
+      ],
+      "cwd": "/work2/LightRE/samples/minilua/.cache/obfuscator-llvm",
+      "environment": {}
+    },
+    {
+      "argv": [
+        "git",
+        "apply",
+        "/work2/LightRE/samples/minilua/patches/obfuscator-function-filter.patch"
+      ],
+      "cwd": "/work2/LightRE/samples/minilua/.cache/obfuscator-llvm",
+      "environment": {}
+    },
+    {
+      "argv": [
+        "git",
+        "diff",
+        "--name-only"
+      ],
+      "cwd": "/work2/LightRE/samples/minilua/.cache/obfuscator-llvm",
+      "environment": {}
+    },
+    {
+      "argv": [
+        "llvm-config-14",
+        "--cmakedir"
+      ],
+      "cwd": "/work2/LightRE/samples/minilua",
+      "environment": {}
+    },
+    {
+      "argv": [
+        "cmake",
+        "-G",
+        "Ninja",
+        "-S",
+        "/work2/LightRE/samples/minilua/.cache/obfuscator-llvm",
+        "-B",
+        "/work2/LightRE/samples/minilua/.cache/obfuscator-build",
+        "-DLLVM_DIR=/usr/lib/llvm-14/lib/cmake/llvm",
+        "-DCMAKE_BUILD_TYPE=Release",
+        "-DCMAKE_C_COMPILER=clang-14",
+        "-DCMAKE_CXX_COMPILER=clang++-14"
+      ],
+      "cwd": "/work2/LightRE/samples/minilua",
+      "environment": {}
+    },
+    {
+      "argv": [
+        "cmake",
+        "--build",
+        "/work2/LightRE/samples/minilua/.cache/obfuscator-build",
+        "--parallel",
+        "2"
+      ],
+      "cwd": "/work2/LightRE/samples/minilua",
+      "environment": {}
+    },
+    {
+      "argv": [
+        "clang-14",
+        "--target=aarch64-linux-gnu",
+        "--gcc-toolchain=/usr",
+        "-O2",
+        "-fPIE",
+        "-ffunction-sections",
+        "-fdata-sections",
+        "-g0",
+        "-emit-llvm",
+        "-c",
+        "src/minilua.c",
+        "-o",
+        "reference/baseline.bc"
+      ],
+      "cwd": "/work2/LightRE/samples/minilua",
+      "environment": {}
+    },
+    {
+      "argv": [
+        "opt-14",
+        "-load-pass-plugin",
+        "/work2/LightRE/samples/minilua/.cache/obfuscator-build/libLLVMObfuscator.so",
+        "-passes=function(flattening),verify",
+        "-verify-each",
+        "reference/baseline.bc",
+        "-o",
+        "reference/obfuscated.bc"
+      ],
+      "cwd": "/work2/LightRE/samples/minilua",
+      "environment": {
+        "LLVM_OBF_SEED": "0xA04252B187478C00A40BC6D81D1A8A52",
+        "LLVM_OBF_FUNCTIONS": "luaH_get,luaH_set"
+      }
+    },
+    {
+      "argv": [
+        "llvm-dis-14",
+        "reference/baseline.bc",
+        "-o",
+        "reference/baseline.ll"
+      ],
+      "cwd": "/work2/LightRE/samples/minilua",
+      "environment": {}
+    },
+    {
+      "argv": [
+        "llc-14",
+        "-O2",
+        "-mtriple=aarch64-linux-gnu",
+        "-relocation-model=pic",
+        "-function-sections",
+        "-data-sections",
+        "-filetype=obj",
+        "reference/baseline.bc",
+        "-o",
+        "reference/baseline.o"
+      ],
+      "cwd": "/work2/LightRE/samples/minilua",
+      "environment": {}
+    },
+    {
+      "argv": [
+        "clang-14",
+        "--target=aarch64-linux-gnu",
+        "--gcc-toolchain=/usr",
+        "-O2",
+        "-fPIE",
+        "-ffunction-sections",
+        "-fdata-sections",
+        "-g0",
+        "-pie",
+        "-Wl,--gc-sections",
+        "-Wl,--build-id=sha1",
+        "reference/baseline.o",
+        "-lm",
+        "-o",
+        "reference/baseline.full"
+      ],
+      "cwd": "/work2/LightRE/samples/minilua",
+      "environment": {}
+    },
+    {
+      "argv": [
+        "aarch64-linux-gnu-objdump",
+        "-d",
+        "reference/baseline.full"
+      ],
+      "cwd": "/work2/LightRE/samples/minilua",
+      "environment": {}
+    },
+    {
+      "argv": [
+        "llvm-dis-14",
+        "reference/obfuscated.bc",
+        "-o",
+        "reference/obfuscated.ll"
+      ],
+      "cwd": "/work2/LightRE/samples/minilua",
+      "environment": {}
+    },
+    {
+      "argv": [
+        "llc-14",
+        "-O2",
+        "-mtriple=aarch64-linux-gnu",
+        "-relocation-model=pic",
+        "-function-sections",
+        "-data-sections",
+        "-filetype=obj",
+        "reference/obfuscated.bc",
+        "-o",
+        "reference/obfuscated.o"
+      ],
+      "cwd": "/work2/LightRE/samples/minilua",
+      "environment": {}
+    },
+    {
+      "argv": [
+        "clang-14",
+        "--target=aarch64-linux-gnu",
+        "--gcc-toolchain=/usr",
+        "-O2",
+        "-fPIE",
+        "-ffunction-sections",
+        "-fdata-sections",
+        "-g0",
+        "-pie",
+        "-Wl,--gc-sections",
+        "-Wl,--build-id=sha1",
+        "reference/obfuscated.o",
+        "-lm",
+        "-o",
+        "reference/obfuscated.full"
+      ],
+      "cwd": "/work2/LightRE/samples/minilua",
+      "environment": {}
+    },
+    {
+      "argv": [
+        "aarch64-linux-gnu-objdump",
+        "-d",
+        "reference/obfuscated.full"
+      ],
+      "cwd": "/work2/LightRE/samples/minilua",
+      "environment": {}
+    },
+    {
+      "argv": [
+        "aarch64-linux-gnu-strip",
+        "--strip-all",
+        "reference/baseline.stripped"
+      ],
+      "cwd": "/work2/LightRE/samples/minilua",
+      "environment": {}
+    },
+    {
+      "argv": [
+        "aarch64-linux-gnu-strip",
+        "--strip-all",
+        "deliverable/minilua"
+      ],
+      "cwd": "/work2/LightRE/samples/minilua",
+      "environment": {}
+    },
+    {
+      "argv": [
+        "clang-14",
+        "--version"
+      ],
+      "cwd": "/work2/LightRE/samples/minilua",
+      "environment": {}
+    },
+    {
+      "argv": [
+        "llc-14",
+        "--version"
+      ],
+      "cwd": "/work2/LightRE/samples/minilua",
+      "environment": {}
+    },
+    {
+      "argv": [
+        "aarch64-linux-gnu-ld",
+        "--version"
+      ],
+      "cwd": "/work2/LightRE/samples/minilua",
+      "environment": {}
+    },
+    {
+      "argv": [
+        "aarch64-linux-gnu-strip",
+        "--version"
+      ],
+      "cwd": "/work2/LightRE/samples/minilua",
+      "environment": {}
+    },
+    {
+      "argv": [
+        "cmake",
+        "--version"
+      ],
+      "cwd": "/work2/LightRE/samples/minilua",
+      "environment": {}
+    },
+    {
+      "argv": [
+        "python3",
+        "--version"
+      ],
+      "cwd": "/work2/LightRE/samples/minilua",
+      "environment": {}
+    },
+    {
+      "argv": [
+        "dpkg-query",
+        "-W",
+        "libc6",
+        "libc6-dev"
+      ],
+      "cwd": "/work2/LightRE/samples/minilua",
+      "environment": {}
+    },
+    {
+      "argv": [
+        "python3",
+        "/work2/LightRE/samples/minilua/scripts/test.py"
+      ],
+      "cwd": "/work2/LightRE/samples/minilua",
+      "environment": {}
+    },
+    {
+      "argv": [
+        "python3",
+        "/work2/LightRE/samples/minilua/scripts/verify.py"
+      ],
+      "cwd": "/work2/LightRE/samples/minilua",
+      "environment": {}
+    }
+  ],
+  "profile": "small",
+  "passes": "flattening",
+  "compiled_source_sha256": "6d009f73e87e9d50ea6d32d05a9959d3f5b2afe1b81562b48866715acd59e2a6",
+  "size": {
+    "files": {
+      "minilua": 199184,
+      "smoke.lua": 279
+    },
+    "total_bytes": 199463,
+    "limit_bytes": 300000
+  },
+  "tests": {
+    "passed": true,
+    "case_count": 10,
+    "execution_count": 40,
+    "timeout_seconds": 30,
+    "normalization": "none; all output compared byte for byte",
+    "runtime": {
+      "mode": "native",
+      "sysroot": "/",
+      "sysroot_source": "native libc6/libc6-dev packages",
+      "runner": []
+    },
+    "results": [
+      {
+        "case": "smoke",
+        "binary": "reference/baseline.full",
+        "command": [
+          "/work2/LightRE/samples/minilua/reference/baseline.full",
+          "tests/smoke.lua"
+        ],
+        "elapsed_seconds": 0.0004853750579059124,
+        "stdout": "smoke: 10 42 3.5 3.75\n",
+        "stderr": "",
+        "exit_code": 0,
+        "timed_out": false
+      },
+      {
+        "case": "smoke",
+        "binary": "reference/baseline.stripped",
+        "command": [
+          "/work2/LightRE/samples/minilua/reference/baseline.stripped",
+          "tests/smoke.lua"
+        ],
+        "elapsed_seconds": 0.0003933338448405266,
+        "stdout": "smoke: 10 42 3.5 3.75\n",
+        "stderr": "",
+        "exit_code": 0,
+        "timed_out": false
+      },
+      {
+        "case": "smoke",
+        "binary": "reference/obfuscated.full",
+        "command": [
+          "/work2/LightRE/samples/minilua/reference/obfuscated.full",
+          "tests/smoke.lua"
+        ],
+        "elapsed_seconds": 0.0012418748810887337,
+        "stdout": "smoke: 10 42 3.5 3.75\n",
+        "stderr": "",
+        "exit_code": 0,
+        "timed_out": false
+      },
+      {
+        "case": "smoke",
+        "binary": "deliverable/minilua",
+        "command": [
+          "/work2/LightRE/samples/minilua/deliverable/minilua",
+          "tests/smoke.lua"
+        ],
+        "elapsed_seconds": 0.00038945884443819523,
+        "stdout": "smoke: 10 42 3.5 3.75\n",
+        "stderr": "",
+        "exit_code": 0,
+        "timed_out": false
+      },
+      {
+        "case": "tables",
+        "binary": "reference/baseline.full",
+        "command": [
+          "/work2/LightRE/samples/minilua/reference/baseline.full",
+          "tests/tables.lua"
+        ],
+        "elapsed_seconds": 0.003132457844913006,
+        "stdout": "tables: 4096 25171968 keys metatables\n",
+        "stderr": "",
+        "exit_code": 0,
+        "timed_out": false
+      },
+      {
+        "case": "tables",
+        "binary": "reference/baseline.stripped",
+        "command": [
+          "/work2/LightRE/samples/minilua/reference/baseline.stripped",
+          "tests/tables.lua"
+        ],
+        "elapsed_seconds": 0.003074042033404112,
+        "stdout": "tables: 4096 25171968 keys metatables\n",
+        "stderr": "",
+        "exit_code": 0,
+        "timed_out": false
+      },
+      {
+        "case": "tables",
+        "binary": "reference/obfuscated.full",
+        "command": [
+          "/work2/LightRE/samples/minilua/reference/obfuscated.full",
+          "tests/tables.lua"
+        ],
+        "elapsed_seconds": 0.0035147920716553926,
+        "stdout": "tables: 4096 25171968 keys metatables\n",
+        "stderr": "",
+        "exit_code": 0,
+        "timed_out": false
+      },
+      {
+        "case": "tables",
+        "binary": "deliverable/minilua",
+        "command": [
+          "/work2/LightRE/samples/minilua/deliverable/minilua",
+          "tests/tables.lua"
+        ],
+        "elapsed_seconds": 0.003923250129446387,
+        "stdout": "tables: 4096 25171968 keys metatables\n",
+        "stderr": "",
+        "exit_code": 0,
+        "timed_out": false
+      },
+      {
+        "case": "closures",
+        "binary": "reference/baseline.full",
+        "command": [
+          "/work2/LightRE/samples/minilua/reference/baseline.full",
+          "tests/closures.lua",
+          "fixed-argument"
+        ],
+        "elapsed_seconds": 0.00044558290392160416,
+        "stdout": "closures: 8 recursion: 3628800 varargs: 17 4\n",
+        "stderr": "",
+        "exit_code": 0,
+        "timed_out": false
+      },
+      {
+        "case": "closures",
+        "binary": "reference/baseline.stripped",
+        "command": [
+          "/work2/LightRE/samples/minilua/reference/baseline.stripped",
+          "tests/closures.lua",
+          "fixed-argument"
+        ],
+        "elapsed_seconds": 0.00037174997851252556,
+        "stdout": "closures: 8 recursion: 3628800 varargs: 17 4\n",
+        "stderr": "",
+        "exit_code": 0,
+        "timed_out": false
+      },
+      {
+        "case": "closures",
+        "binary": "reference/obfuscated.full",
+        "command": [
+          "/work2/LightRE/samples/minilua/reference/obfuscated.full",
+          "tests/closures.lua",
+          "fixed-argument"
+        ],
+        "elapsed_seconds": 0.00040675001218914986,
+        "stdout": "closures: 8 recursion: 3628800 varargs: 17 4\n",
+        "stderr": "",
+        "exit_code": 0,
+        "timed_out": false
+      },
+      {
+        "case": "closures",
+        "binary": "deliverable/minilua",
+        "command": [
+          "/work2/LightRE/samples/minilua/deliverable/minilua",
+          "tests/closures.lua",
+          "fixed-argument"
+        ],
+        "elapsed_seconds": 0.00039545795880258083,
+        "stdout": "closures: 8 recursion: 3628800 varargs: 17 4\n",
+        "stderr": "",
+        "exit_code": 0,
+        "timed_out": false
+      },
+      {
+        "case": "errors",
+        "binary": "reference/baseline.full",
+        "command": [
+          "/work2/LightRE/samples/minilua/reference/baseline.full",
+          "tests/errors.lua"
+        ],
+        "elapsed_seconds": 0.00039545795880258083,
+        "stdout": "errors: pcall nil NaN indexing loadstring\n",
+        "stderr": "",
+        "exit_code": 0,
+        "timed_out": false
+      },
+      {
+        "case": "errors",
+        "binary": "reference/baseline.stripped",
+        "command": [
+          "/work2/LightRE/samples/minilua/reference/baseline.stripped",
+          "tests/errors.lua"
+        ],
+        "elapsed_seconds": 0.0003733329940587282,
+        "stdout": "errors: pcall nil NaN indexing loadstring\n",
+        "stderr": "",
+        "exit_code": 0,
+        "timed_out": false
+      },
+      {
+        "case": "errors",
+        "binary": "reference/obfuscated.full",
+        "command": [
+          "/work2/LightRE/samples/minilua/reference/obfuscated.full",
+          "tests/errors.lua"
+        ],
+        "elapsed_seconds": 0.0003802499268203974,
+        "stdout": "errors: pcall nil NaN indexing loadstring\n",
+        "stderr": "",
+        "exit_code": 0,
+        "timed_out": false
+      },
+      {
+        "case": "errors",
+        "binary": "deliverable/minilua",
+        "command": [
+          "/work2/LightRE/samples/minilua/deliverable/minilua",
+          "tests/errors.lua"
+        ],
+        "elapsed_seconds": 0.0003547500818967819,
+        "stdout": "errors: pcall nil NaN indexing loadstring\n",
+        "stderr": "",
+        "exit_code": 0,
+        "timed_out": false
+      },
+      {
+        "case": "allocation",
+        "binary": "reference/baseline.full",
+        "command": [
+          "/work2/LightRE/samples/minilua/reference/baseline.full",
+          "tests/allocation.lua"
+        ],
+        "elapsed_seconds": 0.036413416964933276,
+        "stdout": "allocation: 60000 checksum: 1800090000 automatic-GC: observed\n",
+        "stderr": "",
+        "exit_code": 0,
+        "timed_out": false
+      },
+      {
+        "case": "allocation",
+        "binary": "reference/baseline.stripped",
+        "command": [
+          "/work2/LightRE/samples/minilua/reference/baseline.stripped",
+          "tests/allocation.lua"
+        ],
+        "elapsed_seconds": 0.02682633395306766,
+        "stdout": "allocation: 60000 checksum: 1800090000 automatic-GC: observed\n",
+        "stderr": "",
+        "exit_code": 0,
+        "timed_out": false
+      },
+      {
+        "case": "allocation",
+        "binary": "reference/obfuscated.full",
+        "command": [
+          "/work2/LightRE/samples/minilua/reference/obfuscated.full",
+          "tests/allocation.lua"
+        ],
+        "elapsed_seconds": 0.029211083194240928,
+        "stdout": "allocation: 60000 checksum: 1800090000 automatic-GC: observed\n",
+        "stderr": "",
+        "exit_code": 0,
+        "timed_out": false
+      },
+      {
+        "case": "allocation",
+        "binary": "deliverable/minilua",
+        "command": [
+          "/work2/LightRE/samples/minilua/deliverable/minilua",
+          "tests/allocation.lua"
+        ],
+        "elapsed_seconds": 0.029395209159702063,
+        "stdout": "allocation: 60000 checksum: 1800090000 automatic-GC: observed\n",
+        "stderr": "",
+        "exit_code": 0,
+        "timed_out": false
+      },
+      {
+        "case": "capabilities",
+        "binary": "reference/baseline.full",
+        "command": [
+          "/work2/LightRE/samples/minilua/reference/baseline.full",
+          "tests/capabilities.lua"
+        ],
+        "elapsed_seconds": 0.00042091705836355686,
+        "stdout": "capabilities: Lua 5.1 subset; io.write bit automatic-GC\n",
+        "stderr": "",
+        "exit_code": 0,
+        "timed_out": false
+      },
+      {
+        "case": "capabilities",
+        "binary": "reference/baseline.stripped",
+        "command": [
+          "/work2/LightRE/samples/minilua/reference/baseline.stripped",
+          "tests/capabilities.lua"
+        ],
+        "elapsed_seconds": 0.00035187508910894394,
+        "stdout": "capabilities: Lua 5.1 subset; io.write bit automatic-GC\n",
+        "stderr": "",
+        "exit_code": 0,
+        "timed_out": false
+      },
+      {
+        "case": "capabilities",
+        "binary": "reference/obfuscated.full",
+        "command": [
+          "/work2/LightRE/samples/minilua/reference/obfuscated.full",
+          "tests/capabilities.lua"
+        ],
+        "elapsed_seconds": 0.0003434170503169298,
+        "stdout": "capabilities: Lua 5.1 subset; io.write bit automatic-GC\n",
+        "stderr": "",
+        "exit_code": 0,
+        "timed_out": false
+      },
+      {
+        "case": "capabilities",
+        "binary": "deliverable/minilua",
+        "command": [
+          "/work2/LightRE/samples/minilua/deliverable/minilua",
+          "tests/capabilities.lua"
+        ],
+        "elapsed_seconds": 0.00032787490636110306,
+        "stdout": "capabilities: Lua 5.1 subset; io.write bit automatic-GC\n",
+        "stderr": "",
+        "exit_code": 0,
+        "timed_out": false
+      },
+      {
+        "case": "syntax_error",
+        "binary": "reference/baseline.full",
+        "command": [
+          "/work2/LightRE/samples/minilua/reference/baseline.full",
+          "tests/syntax_error.lua"
+        ],
+        "elapsed_seconds": 0.0002770000137388706,
+        "stdout": "",
+        "stderr": "Error: tests/syntax_error.lua:1: '<name>' expected near '='\n",
+        "exit_code": 1,
+        "timed_out": false
+      },
+      {
+        "case": "syntax_error",
+        "binary": "reference/baseline.stripped",
+        "command": [
+          "/work2/LightRE/samples/minilua/reference/baseline.stripped",
+          "tests/syntax_error.lua"
+        ],
+        "elapsed_seconds": 0.00027887499891221523,
+        "stdout": "",
+        "stderr": "Error: tests/syntax_error.lua:1: '<name>' expected near '='\n",
+        "exit_code": 1,
+        "timed_out": false
+      },
+      {
+        "case": "syntax_error",
+        "binary": "reference/obfuscated.full",
+        "command": [
+          "/work2/LightRE/samples/minilua/reference/obfuscated.full",
+          "tests/syntax_error.lua"
+        ],
+        "elapsed_seconds": 0.00029604206793010235,
+        "stdout": "",
+        "stderr": "Error: tests/syntax_error.lua:1: '<name>' expected near '='\n",
+        "exit_code": 1,
+        "timed_out": false
+      },
+      {
+        "case": "syntax_error",
+        "binary": "deliverable/minilua",
+        "command": [
+          "/work2/LightRE/samples/minilua/deliverable/minilua",
+          "tests/syntax_error.lua"
+        ],
+        "elapsed_seconds": 0.00032350001856684685,
+        "stdout": "",
+        "stderr": "Error: tests/syntax_error.lua:1: '<name>' expected near '='\n",
+        "exit_code": 1,
+        "timed_out": false
+      },
+      {
+        "case": "runtime_error",
+        "binary": "reference/baseline.full",
+        "command": [
+          "/work2/LightRE/samples/minilua/reference/baseline.full",
+          "tests/runtime_error.lua"
+        ],
+        "elapsed_seconds": 0.0002961249556392431,
+        "stdout": "",
+        "stderr": "Error: tests/runtime_error.lua:1: uncaught test error\n",
+        "exit_code": 1,
+        "timed_out": false
+      },
+      {
+        "case": "runtime_error",
+        "binary": "reference/baseline.stripped",
+        "command": [
+          "/work2/LightRE/samples/minilua/reference/baseline.stripped",
+          "tests/runtime_error.lua"
+        ],
+        "elapsed_seconds": 0.0002858750522136688,
+        "stdout": "",
+        "stderr": "Error: tests/runtime_error.lua:1: uncaught test error\n",
+        "exit_code": 1,
+        "timed_out": false
+      },
+      {
+        "case": "runtime_error",
+        "binary": "reference/obfuscated.full",
+        "command": [
+          "/work2/LightRE/samples/minilua/reference/obfuscated.full",
+          "tests/runtime_error.lua"
+        ],
+        "elapsed_seconds": 0.000303083099424839,
+        "stdout": "",
+        "stderr": "Error: tests/runtime_error.lua:1: uncaught test error\n",
+        "exit_code": 1,
+        "timed_out": false
+      },
+      {
+        "case": "runtime_error",
+        "binary": "deliverable/minilua",
+        "command": [
+          "/work2/LightRE/samples/minilua/deliverable/minilua",
+          "tests/runtime_error.lua"
+        ],
+        "elapsed_seconds": 0.0003082500770688057,
+        "stdout": "",
+        "stderr": "Error: tests/runtime_error.lua:1: uncaught test error\n",
+        "exit_code": 1,
+        "timed_out": false
+      },
+      {
+        "case": "no_script",
+        "binary": "reference/baseline.full",
+        "command": [
+          "/work2/LightRE/samples/minilua/reference/baseline.full"
+        ],
+        "elapsed_seconds": 0.00026887492276728153,
+        "stdout": "",
+        "stderr": "",
+        "exit_code": 8,
+        "timed_out": false
+      },
+      {
+        "case": "no_script",
+        "binary": "reference/baseline.stripped",
+        "command": [
+          "/work2/LightRE/samples/minilua/reference/baseline.stripped"
+        ],
+        "elapsed_seconds": 0.0002624171320348978,
+        "stdout": "",
+        "stderr": "",
+        "exit_code": 8,
+        "timed_out": false
+      },
+      {
+        "case": "no_script",
+        "binary": "reference/obfuscated.full",
+        "command": [
+          "/work2/LightRE/samples/minilua/reference/obfuscated.full"
+        ],
+        "elapsed_seconds": 0.0002505828160792589,
+        "stdout": "",
+        "stderr": "",
+        "exit_code": 8,
+        "timed_out": false
+      },
+      {
+        "case": "no_script",
+        "binary": "deliverable/minilua",
+        "command": [
+          "/work2/LightRE/samples/minilua/deliverable/minilua"
+        ],
+        "elapsed_seconds": 0.00024537486024200916,
+        "stdout": "",
+        "stderr": "",
+        "exit_code": 8,
+        "timed_out": false
+      },
+      {
+        "case": "delivered_smoke",
+        "binary": "reference/baseline.full",
+        "command": [
+          "/work2/LightRE/samples/minilua/reference/baseline.full",
+          "deliverable/smoke.lua"
+        ],
+        "elapsed_seconds": 0.0003060000017285347,
+        "stdout": "smoke: 10 42 3.5 3.75\n",
+        "stderr": "",
+        "exit_code": 0,
+        "timed_out": false
+      },
+      {
+        "case": "delivered_smoke",
+        "binary": "reference/baseline.stripped",
+        "command": [
+          "/work2/LightRE/samples/minilua/reference/baseline.stripped",
+          "deliverable/smoke.lua"
+        ],
+        "elapsed_seconds": 0.00030558393336832523,
+        "stdout": "smoke: 10 42 3.5 3.75\n",
+        "stderr": "",
+        "exit_code": 0,
+        "timed_out": false
+      },
+      {
+        "case": "delivered_smoke",
+        "binary": "reference/obfuscated.full",
+        "command": [
+          "/work2/LightRE/samples/minilua/reference/obfuscated.full",
+          "deliverable/smoke.lua"
+        ],
+        "elapsed_seconds": 0.00030416599474847317,
+        "stdout": "smoke: 10 42 3.5 3.75\n",
+        "stderr": "",
+        "exit_code": 0,
+        "timed_out": false
+      },
+      {
+        "case": "delivered_smoke",
+        "binary": "deliverable/minilua",
+        "command": [
+          "/work2/LightRE/samples/minilua/deliverable/minilua",
+          "deliverable/smoke.lua"
+        ],
+        "elapsed_seconds": 0.00030970899388194084,
+        "stdout": "smoke: 10 42 3.5 3.75\n",
+        "stderr": "",
+        "exit_code": 0,
+        "timed_out": false
+      }
+    ]
+  },
+  "elf": {
+    "passed": true,
+    "files": {
+      "reference/baseline.stripped": {
+        "architecture": "AArch64",
+        "class": "ELF64",
+        "endian": "little",
+        "type": "DYN / PIE",
+        "dynamic": true,
+        "interpreter": "/lib/ld-linux-aarch64.so.1",
+        "needed": [
+          "libm.so.6",
+          "libc.so.6"
+        ],
+        "symtab": false,
+        "dwarf": false,
+        "glibc_symbol_versions": [
+          "GLIBC_2.17",
+          "GLIBC_2.29",
+          "GLIBC_2.34"
+        ],
+        "strip_reproduces_exact_bytes": true,
+        "allocated_sections_identical": true
+      },
+      "deliverable/minilua": {
+        "architecture": "AArch64",
+        "class": "ELF64",
+        "endian": "little",
+        "type": "DYN / PIE",
+        "dynamic": true,
+        "interpreter": "/lib/ld-linux-aarch64.so.1",
+        "needed": [
+          "libm.so.6",
+          "libc.so.6"
+        ],
+        "symtab": false,
+        "dwarf": false,
+        "glibc_symbol_versions": [
+          "GLIBC_2.17",
+          "GLIBC_2.29",
+          "GLIBC_2.34"
+        ],
+        "strip_reproduces_exact_bytes": true,
+        "allocated_sections_identical": true
+      }
+    },
+    "size": {
+      "files": {
+        "minilua": 199184,
+        "smoke.lua": 279
+      },
+      "total_bytes": 199463,
+      "limit_bytes": 300000
+    }
+  },
+  "flattening": {
+    "passed": true,
+    "changed_functions": [
+      "luaH_get",
+      "luaH_set"
+    ],
+    "unchanged_function_count": 203,
+    "ir_comparison": "resolve metadata/attribute ID references to contents; preserve instructions",
+    "vm_ir_location": "luaD_call",
+    "vm_container_ir_unchanged": true,
+    "targets": {
+      "luaH_get": {
+        "baseline": {
+          "address": "0x00000000000085a0",
+          "code_bytes": 448,
+          "ir_blocks": 27,
+          "native_blocks": "未测量",
+          "instruction_count": 112,
+          "indirect_jumps_br": 1,
+          "indirect_calls_blr": 0,
+          "unconditional_branch_targets": {
+            "8754": 7,
+            "8600": 1,
+            "868c": 1,
+            "8720": 1,
+            "8734": 1
+          },
+          "state_stores_ir": 0
+        },
+        "obfuscated": {
+          "address": "0x00000000000085a0",
+          "code_bytes": 2104,
+          "ir_blocks": 42,
+          "native_blocks": "未测量",
+          "instruction_count": 526,
+          "indirect_jumps_br": 0,
+          "indirect_calls_blr": 0,
+          "unconditional_branch_targets": {
+            "86a4": 25,
+            "869c": 3,
+            "8b38": 2,
+            "8d78": 2,
+            "8da0": 2,
+            "894c": 1,
+            "8ac0": 1,
+            "8d7c": 1
+          },
+          "state_stores_ir": 38,
+          "dispatcher_excerpt": [
+            "0x86a4: ldr w8, [sp, #44]",
+            "0x86a8: cmp w8, w26",
+            "0x86ac: b.gt 8700 <luaH_get+0x160>",
+            "0x86b0: cmp w8, w27",
+            "0x86b4: b.le 876c <luaH_get+0x1cc>"
+          ]
+        }
+      },
+      "luaH_set": {
+        "baseline": {
+          "address": "0x0000000000008830",
+          "code_bytes": 164,
+          "ir_blocks": 6,
+          "native_blocks": "未测量",
+          "instruction_count": 41,
+          "indirect_jumps_br": 0,
+          "indirect_calls_blr": 0,
+          "unconditional_branch_targets": {
+            "88d4": 1
+          },
+          "state_stores_ir": 0
+        },
+        "obfuscated": {
+          "address": "0x0000000000008ea8",
+          "code_bytes": 552,
+          "ir_blocks": 14,
+          "native_blocks": "未测量",
+          "instruction_count": 138,
+          "indirect_jumps_br": 0,
+          "indirect_calls_blr": 0,
+          "unconditional_branch_targets": {
+            "8f88": 8,
+            "90ac": 1
+          },
+          "state_stores_ir": 9,
+          "dispatcher_excerpt": [
+            "0x8f88: ldur w8, [x29, #-20]",
+            "0x8f8c: cmp w8, w27",
+            "0x8f90: b.gt 8fc0 <luaH_set+0x118>",
+            "0x8f94: cmp w8, w28",
+            "0x8f98: b.gt 8fe8 <luaH_set+0x140>"
+          ]
+        }
+      }
+    }
+  },
+  "input_sha256": {
+    ".clang-format": "b5bdb61d9e34b3f5a1ae2920eb36b682ebe8c2efbc5ed4d360796083d4f0e054",
+    "patches/LICENSE-OBFUSCATOR.TXT": "0c9be6145c13ee8fee9a806f9e1dbfbed054b6c0084732694869255535006d1b",
+    "patches/minilua-large.patch": "e8febf8dffd8a753f9688f59de11514497d1205a944e77a6d3c570292fd88d30",
+    "patches/obfuscator-function-filter.patch": "c9c633af6f829c0b45ca2a4e61bbd742868316516a92012c60c9e1f711c04116",
+    "patches/obfuscator-split-filter.patch": "6d7425379c3eabfe890465913c04b4350e9f77be1e7af6b440e5c5e2fdd6cba1",
+    "scripts/build.py": "1c08906ea9574dad7bd4e52348e04b9cad8dc02f163ab42a3bfe7ca0ae6c4bfb",
+    "scripts/build.sh": "a5e6ba593daf3a171dc5854224dc9bf92edbc3698337144ee51ebbeed03778d3",
+    "scripts/check_lightre.py": "ac7b965aa94e9e61189a7d911a67e2955e121d5bb995b6c523b642f4819bb251",
+    "scripts/check_rebuild.py": "cf907d6681dd44d6216b25a88cedc9def068c995f0de4c8b95e0d9bb99efb348",
+    "scripts/check_size.py": "bda34c7012f97d77e4c87e95f86f43635f8332ab67f99d1dfae2da6364b34b5d",
+    "scripts/format_source.py": "46e4f049dd5291af6640bea0e54f8877f58cf6d2097b45dee339d6ef7cbf1f16",
+    "scripts/install_deps.sh": "dfb432fc00d54749eef5e5bcbbff0cccbb19bc2e067073cd4128f28382a14da9",
+    "scripts/test.py": "d43ec3cb7213dfca8cbb5930f2978f4728a6d13214f9387c268981d663fa4b5f",
+    "scripts/test.sh": "239e394c533a90b1bb7ef023183877d9c8546c351f61dda89e79a1a7a172af53",
+    "scripts/verify.py": "a29db676853ee9377aed210a589ad67c2c7a4ded798e0e28a184594f848c68cd",
+    "sources.json": "8c04780fd359e4bb745223616d597f409c8c198570218d8f173b2e7f8312c394",
+    "src/LICENSE.lua": "2e00f525472bac3426b54e232597ff6e80aa5db3dac63a76682742edae7cb01c",
+    "src/minilua.c": "6d009f73e87e9d50ea6d32d05a9959d3f5b2afe1b81562b48866715acd59e2a6",
+    "src/minilua.original.c": "339c4f324da933ed2fe7439896af7ec6ccb8f159686f972cdb53a240cfd17fc3",
+    "src/modifications.patch": "d31d03b51e814239df89375f6e874ce50fc64ce4c8bdc711e5e434ec6eeed7f4",
+    "tests/allocation.lua": "7a1fa5b8cd7a95d42327c5ebfab30a9a8e6e229649a21033cb3ee47a68b4fb97",
+    "tests/capabilities.lua": "7f5aeee0e700e3150c2ca990a47df2896297c6ccc00334f60195398d12eb79e1",
+    "tests/closures.lua": "fd3531db2cdcb9127457bb041dfac7cafabd7caa021517dafcb3b4369302b6cb",
+    "tests/errors.lua": "b467c9b9c511637d977cd17f85649e88df33b850a7fbf17e921dc23682b77249",
+    "tests/runtime_error.lua": "8e186a3f86da5f20efff2e6fbd34af84c06f4f2274bc2f9007b86227e0c07890",
+    "tests/smoke.lua": "e250438874d4df499b6b7bc5c357ebdec41e1358d24aad65d5e56a094a116d96",
+    "tests/syntax_error.lua": "4148d0c84876ced3ace6ed342183ee35027c85afb285a41cf95bb8f8babbd7f5",
+    "tests/tables.lua": "20a29739c8c628feb6f981441d4cfe32e1add4ed7c6e12a6ea7aa8b2e60aafe5"
+  },
+  "sha256": {
+    "deliverable/minilua": "0432af2744d5f5fcc49d1acbb6c5ad0ff04d7cb62455f0ec2606e3420601e050",
+    "deliverable/smoke.lua": "e250438874d4df499b6b7bc5c357ebdec41e1358d24aad65d5e56a094a116d96",
+    "reference/baseline.asm": "e0b635ff09875fde8d9a365fdc604aac8739621d8b8c24f07f8405017fe7e102",
+    "reference/baseline.bc": "ee285aedb1ef86cf4d3c2213c36805d162ab45c8bf56f168cb3dc3bde6a10c90",
+    "reference/baseline.full": "b9ba00cb173db46615086e01480e6852796f63bc27b07e23b62423999cc78297",
+    "reference/baseline.ll": "acd41af7ac6f631daa199dd147551cd3aa3b479e139d8ac507ee830938276e6c",
+    "reference/baseline.luaH_get.asm": "4d09e792773990e7af549708d5e542150f516a84a8f21c721976510b08e89dd9",
+    "reference/baseline.luaH_get.ll": "82b6ef19b130479e25f981b1b7454d6f5e39d73f19460fd822fec5fbb76a5e93",
+    "reference/baseline.luaH_set.asm": "10c2e7839504be1326ab3fd7c33e8fac7f2af841180d72ba3c3bc8da957cfe9c",
+    "reference/baseline.luaH_set.ll": "d046e6cea1f3c916e84ed57c47935c4922188bcd721a2f664df924a4f4bc256d",
+    "reference/baseline.o": "aa4c32606381bf6fe65238f3de2c65836fcd2ab1a9498e64289c7b091f13a542",
+    "reference/baseline.stripped": "b9369697a22b25c90b94883fa09063c2a463bd57b38626e94fcfe611c15ee06f",
+    "reference/obfuscated.asm": "f18c9f154cddd94c61fcc9f6e61afee9e596f52341cf9c1ca712795f3ca1c88c",
+    "reference/obfuscated.bc": "8a09417c5187def518eebca04a1b69e237903a8ee23b511a3549924a519a0d96",
+    "reference/obfuscated.full": "6860d3af6fefc5ab05b9d057121404a930bcd7d9bb26430e08641ea685a47afa",
+    "reference/obfuscated.ll": "ce8b62fdd992cc32aa43eb79b83e4cb40b0aee6af317d9f0f658703787cd1eaf",
+    "reference/obfuscated.luaH_get.asm": "341e201d92a954b2cb374e7a01e84136c6ce880ab4e1389bb5935c58e0ce9f69",
+    "reference/obfuscated.luaH_get.ll": "5bc2025b49f46220943d672334419c2994d43aba88ea43bafed2fe808c834649",
+    "reference/obfuscated.luaH_set.asm": "45ea58cf4c474438cd58dbe4ccd03770150e2eaeeaed5406136166725c289450",
+    "reference/obfuscated.luaH_set.ll": "a63a87d827a50015351d2b45af3ae31f383aa989bbe5611e3e6fee79614f8983",
+    "reference/obfuscated.o": "dde8fc76f149f22fe8ccb2b4e9de3df82e268d1c0cf21910e05ab8584a9b7a92",
+    "reports/baseline.stripped.readelf.txt": "bfafce97a7730f60535040f69889efabff8a35d0323f4a901059f1b6ec4843a5",
+    "reports/cfg.json": "580a3b32dbadfac82d96e8d5b945f6deeb00dc354f31b045b75b0435a565531d",
+    "reports/elf.json": "3e9c0c09f0614ae1c65599ac8c3d6d38b4e128997cacfd7a2fdd35b4efece5fd",
+    "reports/flattening.log": "97f116f3bc1f360aa3ca936b4700bc3920d06528f90550084bfbeaefd353464b",
+    "reports/minilua.readelf.txt": "8f91ba82718c37b4dddc90ceae51c1a7ce7b006d0fa7528f63df63ad09f3edae",
+    "reports/runtime.json": "8a6f7d2ad50c67457833a1a58e99e79f85d719365088dfaa0ad5c18da3c952ab",
+    "reports/tests.json": "2de0e63418a15c3b80749856e28df8d8db8220320069011164cf649e40d66f0e",
+    "reports/verification.md": "0d0e84d15630ae68688713752dcb556af6d480813c222d712abe69eb4bb16d89",
+    "sources.json": "8c04780fd359e4bb745223616d597f409c8c198570218d8f173b2e7f8312c394"
+  }
+}
