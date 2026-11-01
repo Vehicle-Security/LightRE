@@ -1,40 +1,38 @@
 
 
-### LightRE
+# LightRE
 
-LightRE 以 Agent Skill 为主要入口，用户向 Codex 描述目录和目标：
+LightRE 是面向 ARM64 SO 的逆向分析工具，首要目标是恢复 VM 混淆中的真实业务逻辑，重点处理其中的控制流平坦化和 MBA（混合布尔算术）混淆。以 Agent Skill 为入口，结合 Ghidra 和 Codex，目标是交付可编译、可独立运行、可继续维护的等价源码工程。静态调查、unidbg 动态实验、表达式化简与差分验证的联合方案见 [核心分析路线](docs/LLM_DECOMPILER_DESIGN.md#vm控制流平坦化与-mba)；动态与求解能力尚未接入。
 
-```text
-用 LightRE 打开 ../dg-samples/dC6BDAE，展示函数和汇编。
-```
+当前 V0.2 范围为 Ghidra 直接反编译、一轮 LLM 保守整理与 Web 评论续做。允许保留平坦化、goto、MBA 和 Ghidra 类型，去混淆及 VM 语义恢复留到后续版本；新任务不自动追加深入分析。V0.2 已于 2026-11-01 通过用户人工验收；DG 核心巨函数尚无 C 候选，按用户决定留到后续差分阶段处理。范围与实跑记录见 [V0.2 交付记录](docs/milestones/v0.2/DELIVERY.md)。
 
-V0.1 以这句聊天作为启动入口：Agent 识别目标 SO、导出分析结果、启动 Web 并返回访问地址，用户无需手写 Python 命令或端口参数。后续再按需加入反编译和动态验证。
+已有工作区也可用 `--input-mode assembly` 直接让模型从汇编生成候选，跳过 Ghidra 伪代码及初稿；全部已保存指令和地址一次性内嵌到初始提示词，保留机器码及知识文件快照，可用原 ELF 和 objdump 补核。用法见 [纯汇编输入](docs/milestones/v0.2/USAGE.md#纯汇编输入)。
 
-分析 workspace 按用户指定或上下文动态创建在可见位置，与 LightRE 工具代码分开。多个 SO 版本各自保存 SQLite、源码、知识与证据，共享兼容的 harness；跨版本逐步总结公共 VM 知识，帮助后续版本分析，各版本结论仍需独立验证。
+默认首轮及 Web“继续还原”也会将既无 Ghidra 初稿也无已有候选的函数自动分流到完整汇编输入，保留读取工具并按每批 600 秒执行。汇编与伪代码整理分别合批；超大单函数仍独占一批，不需手动补发纯汇编任务。
 
-当前 workspace 放在会话工作目录 `/work2/` 下：`dC6BDAE-analysis/` 和 `minilua-analysis/`，不放入工具或样本 Git 仓库。Agent 启动快捷指令：[dg-samples SO](tests/dg_start.md)、[minilua](tests/minilua_start.md)；用于打开样本供人工查看，不运行测试套件。一个 Web 进程固定打开一份 SO 结果，换目标时由 Skill 重启服务。
+长期自动化以 [Goal Loop](docs/GOAL_LOOP.md) 为支柱：一次提交目标，由 Python 循环调用 `codex exec`，根据实际构建、运行与回归结果自动续做，直至通过交付检查。该闭环尚在规划；现有功能提供静态分析、源码候选与可选的 Web 审阅。
 
-核心是分析 VM/OLLVM 等复杂混淆的 SO：Agent 根据功能说明写脚本调用 LightRE 的本地 Python API，反复运行 unidbg、保存 Evidence 并继续分析。最终交付简单可读、可执行的等价源码，用于二次开发；Web 帮助人工查看逻辑、验收版本和提交后续任务。
+下一小步 [V0.31](docs/milestones/v0.31/PLAN.md) 先做简单 Android ARM64 测试 SO 的 unidbg harness、结果保存与重放，以及每轮独立 exec、完整保存返回和反馈真实失败的 harness 修复 loop，尚未实现。真实目标适配、候选构建和双边差分按 [V0.3 总体方案](docs/milestones/v0.3/PLAN.md) 后续分步加入。
 
-Web 反馈后，Agent 继续按需调用 Rizin/Ghidra 和 unidbg，多轮分析、差分验证并更新结果。失败尝试和反例保留为 Evidence，未解决项及续做条件记入知识 Markdown，供新会话继续处理。
-
-V0.1 已实现：独立分析导出、外部工作区，以及只读 Web 的函数搜索、LINES 排序、浅色/深色、滚动自动加载和紧凑布局。左栏可在 220–400px 范围拖动调宽，三列随宽度调整，LINES 居中。让 Agent 读取本项目的 [SKILL.md](SKILL.md) 并打开目标即可，无需全局安装。本轮人工验收反馈与样本记录见 [V0.1 milestone](docs/milestones/v0.1/DELIVERY.md)。
+让 Codex 读取项目中的 [SKILL.md](SKILL.md)，描述目标目录或二进制文件即可，无需全局安装 Skill：
 
 ```text
-读取 /work2/LightRE/SKILL.md，打开 /work2/dg-samples/dC6BDAE，展示函数和汇编。
+读取 LightRE/SKILL.md，打开 ./dg-samples/dC6BDAE，展示函数和汇编。
 ```
 
-用法与本地 API 见 [V0.1 使用说明](docs/milestones/v0.1/USAGE.md)。动态分析和 LLM 还原留待后续小步实现。
+Agent 会识别目标、创建或恢复外部分析工作区、导出结果，启动 Web 并返回访问地址。默认工作区位于调用 Skill 时的目录下，相对路径也以该目录为基准；临时切到工具目录不改变分析产物位置。上例假设 LightRE 与 dg-samples 位于调用目录下，其他布局使用实际路径。也可使用仓库内的启动指令调用 Codex CLI：
 
-当前 [V0.2：单函数还原候选展示](docs/milestones/v0.2/DELIVERY.md)已实现，等待人工验收。Agent 将候选 C 代码保存在当前 SO 的分析目录，Web 的“还原代码”页签直接读取同一份文件，标明未验证；没有候选的函数仍可浏览汇编。
+```bash
+codex exec --sandbox danger-full-access --skip-git-repo-check - < LightRE/tests/dg_start.md
+```
 
-新电脑 clone 后可直接把 [minilua_start.md](tests/minilua_start.md) 交给 Agent：仓库内置 ARM64 minilua 和 `0x23314` 的 15 指令候选示例，无需旧机器的 workspace 或 dg-samples。依赖准备、候选 API 和人工修改方式见 [V0.2 使用说明](docs/milestones/v0.2/USAGE.md)。
+仓库内置 ARM64 minilua 样本，可将 [minilua 启动指令](tests/minilua_start.md)交给 Agent 体验；已有样本可使用 [dg 启动指令](tests/dg_start.md)。
 
-代码与文档按职责放置：`src/analyzers/rizin.py` 负责分析导出，`src/workspace.py` 提供工作区及持久结果读取，`src/webui/` 只展示结果。阶段使用说明与交付记录放在 `docs/milestones/<版本>/`；长期设计、需求和实现计划保留在 `docs/`。
+分析流程由 Ghidra Headless 统一导出自身识别的函数、范围、汇编、参考伪代码与分组。LightRE 自动整理模块初稿，再按模块分批调用本地 Codex CLI，默认 8 批并发。单函数反编译失败保留汇编和原因，首轮材料不足则明确未解决，新任务完成一轮后停止，也可用评论继续调查；静态导出整体失败则保留旧结果并报错。首轮直接批量审阅初稿并返回局部修改，避免逐函数深入调查和重复输出大段源码；失败独立有限重试，进度区分候选、未解决与执行失败。Web 读取已保存结果，不重复启动 Ghidra。Rizin 仅作为 Agent 按需使用的可选工具。
 
-继续开发时先读[当前交付记录](docs/milestones/v0.1/DELIVERY.md)、[设计文档的开发基线](docs/LLM_DECOMPILER_DESIGN.md#开发基线)和[小步计划](docs/IMPLEMENTATION_PLAN.md)，根据用户反馈确定下一个可运行的小增量。
+Web 支持函数名称/RVA 搜索、汇编分段浏览、源码查看及并列对照、状态筛选和任务进度。用户可针对函数提交修改建议继续分析，无需逐个认可；评论优先入队，任务支持暂停、继续和取消。Web 展示实际保存片段的代码和普通注释，隐藏机器定位注释；提交建议保留原始片段快照与摘要。候选均未经执行验证，unidbg 和差分验证尚未接入。
 
-[思考](docs/ARM64_RE_R&D.md)
-[架构设计](docs/LLM_DECOMPILER_DESIGN.md)
-[小步实现计划](docs/IMPLEMENTATION_PLAN.md)
-[开发进展](docs/REQUIREMENTS.md)
+分析工作区与工具及样本仓库分离，位置可指定。每份 SO 独立保存 SQLite、源码、知识和任务记录；源码位于 `source/src/`，函数知识统一保存在 `knowledge.md`，按 RVA 分节。任务、模型输出和日志持久保存，新会话可继续处理未解决问题。
+
+- [使用说明与本地 API](docs/milestones/v0.2/USAGE.md)
+- [文档入口：职责、阅读顺序与版本范围](docs/README.md)

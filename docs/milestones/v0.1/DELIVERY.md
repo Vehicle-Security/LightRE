@@ -1,6 +1,6 @@
 # V0.1 milestone：函数与原始汇编浏览
 
-本轮人工验收反馈已落实，V0.1 整理为本次 GitHub 提交基线。[V0.2 单函数候选展示](../v0.2/PLAN.md)已确认计划，尚未实现。使用流程见 [USAGE.md](USAGE.md)，Agent 入口见 [SKILL.md](../../../SKILL.md)。
+历史记录：V0.1 人工验收反馈已落实，整理为基础提交。下文的功能、数量、限制与使用方式均描述 V0.1 当时状态；当前版本见 [V0.2 计划](../v0.2/PLAN.md)与 [V0.2 交付记录](../v0.2/DELIVERY.md)。本版使用流程见 [USAGE.md](USAGE.md)，Agent 入口见 [SKILL.md](../../../SKILL.md)。
 
 ## 交付范围
 

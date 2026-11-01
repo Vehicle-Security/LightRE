@@ -9,6 +9,7 @@ RIZIN_HOME="$TOOLS_DIR/rizin"
 GHIDRA_HOME="$TOOLS_DIR/ghidra"
 GHIDRA_URL="${GHIDRA_URL:-}"
 INSTALL_GHIDRA=true
+INSTALL_RIZIN=false
 
 die() {
   printf 'error: %s\n' "$*" >&2
@@ -26,25 +27,45 @@ has_rizin() {
   }
 }
 
-has_ghidra() {
-  [[ -x "$GHIDRA_HOME/support/analyzeHeadless" ]]
+ghidra_platform() {
+  case "$(uname -m)" in
+    x86_64) printf 'linux_x86_64' ;;
+    aarch64) printf 'linux_arm_64' ;;
+    *) die "不支持的 Linux 架构: $(uname -m)" ;;
+  esac
 }
 
-has_java21() {
-  local major
+has_ghidra() {
+  [[ -x "$GHIDRA_HOME/support/analyzeHeadless" &&
+     -x "$GHIDRA_HOME/Ghidra/Features/Decompiler/os/$(ghidra_platform)/decompile" &&
+     -x "$GHIDRA_HOME/Ghidra/Features/Decompiler/os/$(ghidra_platform)/sleigh" ]]
+}
+
+has_java() {
+  local major required=25
+
+  if [[ -f "$GHIDRA_HOME/Ghidra/application.properties" ]]; then
+    required="$(sed -n 's/^application.java.min=//p' "$GHIDRA_HOME/Ghidra/application.properties")"
+  fi
 
   command -v java >/dev/null 2>&1 || return 1
   major="$(java -version 2>&1 | sed -n 's/.*version "\([0-9][0-9]*\).*/\1/p' | head -n 1)"
-  [[ "$major" =~ ^[0-9]+$ ]] && (( major >= 21 ))
+  [[ "$major" =~ ^[0-9]+$ ]] && (( major >= required ))
 }
 
 has_build_dependencies() {
   local command_name
 
-  for command_name in curl git python3 unzip meson ninja pkg-config; do
+  for command_name in curl git python3 unzip make gcc g++ bison flex clang-format; do
     command -v "$command_name" >/dev/null 2>&1 || return 1
   done
-  ! "$INSTALL_GHIDRA" || has_java21
+  python3 -c 'import markdown_it' >/dev/null 2>&1 || return 1
+  if "$INSTALL_RIZIN"; then
+    for command_name in meson ninja pkg-config; do
+      command -v "$command_name" >/dev/null 2>&1 || return 1
+    done
+  fi
+  ! "$INSTALL_GHIDRA" || has_java
 }
 
 as_root() {
@@ -58,20 +79,22 @@ as_root() {
 }
 
 install_system_packages() {
-  local java_packages=()
+  local java_packages=() rizin_packages=()
   if "$INSTALL_GHIDRA"; then
-    java_packages=(openjdk-21-jdk)
+    java_packages=(openjdk-25-jdk)
+  fi
+  if "$INSTALL_RIZIN"; then
+    rizin_packages=(meson ninja-build pkg-config libcapstone-dev liblz4-dev libzip-dev
+      libxxhash-dev libmagic-dev libssl-dev libzstd-dev libtree-sitter-dev)
   fi
   command -v apt-get >/dev/null 2>&1 || die "此脚本仅支持 Ubuntu 24.04。"
 
   log "安装 Ubuntu 24.04 依赖"
   as_root apt-get update
   as_root apt-get install -y \
-    ca-certificates curl git python3 unzip \
+    ca-certificates curl git python3 python3-markdown-it unzip \
     "${java_packages[@]}" \
-    build-essential meson ninja-build pkg-config \
-    libcapstone-dev liblz4-dev libzip-dev libxxhash-dev \
-    libmagic-dev libssl-dev libzstd-dev libtree-sitter-dev
+    build-essential bison flex clang-format zlib1g-dev "${rizin_packages[@]}"
 }
 
 build_rizin_from_source() {
@@ -132,7 +155,7 @@ else:
 install_ghidra() {
   local url archive temp_dir extracted_dir
 
-  if has_ghidra; then
+  if [[ -x "$GHIDRA_HOME/support/analyzeHeadless" ]]; then
     log "Ghidra Headless 已存在：$GHIDRA_HOME"
     return
   fi
@@ -164,24 +187,42 @@ install_ghidra() {
   [[ -x "$GHIDRA_HOME/support/analyzeHeadless" ]] || die "Ghidra 安装完成但找不到 support/analyzeHeadless"
 }
 
+prepare_ghidra_native() {
+  local platform native source
+  platform="$(ghidra_platform)"
+  native="$GHIDRA_HOME/Ghidra/Features/Decompiler/os/$platform"
+  [[ -x "$native/decompile" && -x "$native/sleigh" ]] && return
+  source="$GHIDRA_HOME/Ghidra/Features/Decompiler/src/decompile/cpp"
+  log "构建 Ghidra 本机反编译器：$platform"
+  make -C "$source" -j"${BUILD_JOBS:-4}" ghidra_opt ARCH_TYPE= OSDIR="$platform"
+  make -C "$source" -j"${BUILD_JOBS:-4}" sleigh_opt ARCH_TYPE= OSDIR="$platform"
+  mkdir -p "$native"
+  install -m 755 "$source/ghidra_opt" "$native/decompile"
+  install -m 755 "$source/sleigh_opt" "$native/sleigh"
+}
+
 main() {
   case "$*" in
     "") ;;
-    --rizin-only) INSTALL_GHIDRA=false ;;
-    *) die "用法：bash scripts/install_deps.sh [--rizin-only]" ;;
+    --with-rizin) INSTALL_RIZIN=true ;;
+    --rizin-only) INSTALL_GHIDRA=false; INSTALL_RIZIN=true ;;
+    *) die "用法：bash scripts/install_deps.sh [--with-rizin | --rizin-only]" ;;
   esac
   cd -- "$PROJECT_DIR"
   mkdir -p "$TOOLS_DIR"
 
-  if has_rizin && { ! "$INSTALL_GHIDRA" || has_ghidra; } && has_build_dependencies; then
+  if { ! "$INSTALL_RIZIN" || has_rizin; } && { ! "$INSTALL_GHIDRA" || has_ghidra; } && has_build_dependencies; then
     log "所需工具及其依赖都已存在，跳过安装"
     return 0
   fi
 
   install_system_packages
-  install_rizin
+  if "$INSTALL_RIZIN"; then
+    install_rizin
+  fi
   if "$INSTALL_GHIDRA"; then
     install_ghidra
+    prepare_ghidra_native
   fi
 
   log "安装完成"
@@ -190,7 +231,9 @@ main() {
     printf '  source %q\n' "$PROJECT_DIR/set_env.sh"
   fi
   printf '\n检查命令：\n'
-  printf '  %q -v\n' "$RIZIN_HOME/bin/rizin"
+  if "$INSTALL_RIZIN"; then
+    printf '  %q -v\n' "$RIZIN_HOME/bin/rizin"
+  fi
   if "$INSTALL_GHIDRA"; then
     printf '  %q\n' "$GHIDRA_HOME/support/analyzeHeadless"
   fi

@@ -17,6 +17,7 @@ document.documentElement.dataset.theme = savedTheme || (matchMedia('(prefers-col
   --text:#d7dddf;--muted:#859196;--accent:#b8e986;--input:#101416;
   --hover:#22282b;--selected:#253026;--address:#859b91;--bytes:#77858c;
   --mnemonic:#a3c9ef;--operand:#d1d6d9;--reg:#d6bd94;--number:#b8cc9b;
+  --code-keyword:#c3a6eb;--code-string:#b8cc9b;--code-comment:#859196;--code-type:#d6bd94;
   --error:#efab98;--button:#263322;--button-hover:#34482e;
   --mono:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;
 }
@@ -26,14 +27,15 @@ document.documentElement.dataset.theme = savedTheme || (matchMedia('(prefers-col
   --text:#243039;--muted:#61717b;--accent:#367123;--input:#fff;
   --hover:#eaf0f3;--selected:#e5f1df;--address:#45695c;--bytes:#6c7780;
   --mnemonic:#21629d;--operand:#243039;--reg:#875c22;--number:#436b25;
+  --code-keyword:#7541a5;--code-string:#436b25;--code-comment:#61717b;--code-type:#875c22;
   --error:#b33b2c;--button:#e5f1df;--button-hover:#d6e8cd;
 }
 *{box-sizing:border-box}
 body{margin:0;height:100dvh;display:flex;flex-direction:column;background:var(--bg);color:var(--text);font:13px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-button,input{font:inherit}
+button,input,textarea,select{font:inherit}
 button{cursor:pointer}
 button:disabled{cursor:default;opacity:.5}
-button:focus-visible,input:focus-visible,a:focus-visible,.sidebar-resizer:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+button:focus-visible,input:focus-visible,textarea:focus-visible,a:focus-visible,.sidebar-resizer:focus-visible,.code-resizer:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 header{height:44px;flex-shrink:0;display:flex;align-items:center;padding:0 16px;border-bottom:1px solid var(--line);gap:20px;background:var(--chrome)}
 .brand{font-size:20px;font-weight:650;letter-spacing:-.8px;white-space:nowrap}
 .brand span{color:var(--accent)}
@@ -53,8 +55,8 @@ header{height:44px;flex-shrink:0;display:flex;align-items:center;padding:0 16px;
 aside{background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;min-width:0}
 .sidebar-resizer{cursor:col-resize;touch-action:none;background:var(--chrome)}
 .sidebar-resizer:hover,.sidebar-resizer:focus-visible,.resizing .sidebar-resizer{background:var(--accent)}
-.resizing{user-select:none}
-.resizing *{cursor:col-resize!important}
+.resizing,.resizing-code{user-select:none}
+.resizing *,.resizing-code *{cursor:col-resize!important}
 .sidebar-heading{padding:7px 10px 6px;display:flex;justify-content:space-between;align-items:center;font-weight:600}
 .count{font:11px var(--mono);color:var(--muted);font-weight:400}
 .search-wrap{padding:0 10px 6px;position:relative}
@@ -64,6 +66,7 @@ input:focus{border-color:var(--accent)}
 input::placeholder{color:var(--muted)}
 input::-webkit-search-cancel-button{appearance:none}
 .clear{position:absolute;right:17px;top:0;border:0;background:none;color:var(--muted);padding:3px 5px;font-size:17px}
+.status-filter{margin:0 10px 6px;padding:3px 5px;border:1px solid var(--line);border-radius:4px;background:var(--input);color:var(--text);font-size:11px;min-width:0}
 .columns,.function{display:grid;grid-template-columns:minmax(70px,1fr) minmax(0,1.4fr) minmax(44px,1fr);gap:4px;align-items:center}
 .columns{padding:5px 12px;border-block:1px solid var(--line);font:11px/17px var(--mono);color:var(--muted)}
 .column-sort{padding:0;border:0;background:none;color:var(--muted);text-align:left;font:inherit;white-space:nowrap}
@@ -74,7 +77,13 @@ input::-webkit-search-cancel-button{appearance:none}
 .function:hover{background:var(--hover)}
 .function[aria-current=true]{background:var(--selected);border-left-color:var(--accent)}
 .function .addr{color:var(--address)}
-.function .name{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.function .name{min-width:0;display:flex;align-items:center;gap:4px;white-space:nowrap}
+.name-text{overflow:hidden;text-overflow:ellipsis}
+.function-status{flex:0 0 10px;text-align:center;color:var(--muted);font-size:10px}
+.function-status[data-status=llm]{color:var(--accent)}
+.function-status[data-status=unresolved],.function-status[data-status=failed]{color:var(--error)}
+.function-status[data-status=running]{color:var(--mnemonic)}
+.function-status[data-status=queued]{color:var(--mnemonic)}
 .function .lines{text-align:center;color:var(--number);font-variant-numeric:tabular-nums;white-space:nowrap}
 .function[aria-current=true] .addr,.function[aria-current=true] .lines{color:var(--accent)}
 .list-empty{padding:22px 12px;color:var(--muted);line-height:1.8}
@@ -84,18 +93,78 @@ main{display:flex;flex-direction:column;min-height:0;min-width:0}
 h1{min-width:0;font:500 16px var(--mono);margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .function-meta{font:11px var(--mono);color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 16px}
 .function-meta strong{color:var(--accent);font-weight:400}
-.code-tab{height:28px;display:flex;align-items:stretch;border-bottom:1px solid var(--line);padding:0 16px;justify-content:space-between;flex-shrink:0}
-.code-tabs{display:flex;align-items:stretch;gap:16px}
-.view-tab{display:flex;align-items:center;border:0;border-bottom:2px solid transparent;background:none;color:var(--muted);padding:0;font-size:12px;gap:8px}
-.view-tab[aria-selected=true]{border-bottom-color:var(--accent);color:var(--text)}
-.tab-icon{font:13px var(--mono);color:var(--accent)}
-.code-note{align-self:center;font-size:11px;color:var(--muted)}
-.code-scroll{overflow:auto;flex:1;position:relative}
+.code-tab{height:28px;display:flex;align-items:center;border-bottom:1px solid var(--line);padding:0 16px;gap:12px;justify-content:space-between;flex-shrink:0}
+.code-tabs{display:inline-flex;align-items:center;gap:3px;flex-shrink:0}
+.view-tab{display:flex;align-items:center;justify-content:center;height:22px;border:0;border-radius:3px;background:none;color:var(--muted);padding:0 7px;font-size:12px;line-height:18px;gap:5px;white-space:nowrap}
+.view-tab:hover{background:var(--hover);color:var(--text)}
+.view-tab[aria-selected=true]{background:var(--selected);color:var(--accent)}
+.tab-icon{width:14px;height:14px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.code-note{font-size:11px;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.code-views{display:grid;grid-template-columns:minmax(0,1fr);flex:1;min-height:0;min-width:0}
+.code-views.split{grid-template-columns:minmax(0,var(--assembly-share,1fr)) 5px minmax(0,var(--candidate-share,1fr))}
+.code-pane{display:flex;flex-direction:column;min-height:0;min-width:0}
+.code-resizer{cursor:col-resize;touch-action:none;background:var(--line)}
+.code-resizer:hover,.code-resizer:focus-visible,.resizing-code .code-resizer{background:var(--accent)}
+.pane-heading{display:none;padding:5px 16px;background:var(--chrome);border-bottom:1px solid var(--line);font-size:11px;color:var(--muted);flex-shrink:0}
+.code-views.split .pane-heading{display:block}
+.code-scroll{overflow:auto;flex:1;position:relative;min-height:0;min-width:0}
 .candidate-meta{padding:8px 16px;border-bottom:1px solid var(--line);color:var(--muted);font:11px/18px var(--mono);overflow-wrap:anywhere}
 .candidate-meta strong{color:var(--error);font-weight:500}
-.candidate-code{margin:0;padding:12px 16px;font:12px/22px var(--mono);white-space:pre;tab-size:4}
+.feedback-bar{padding:6px 16px;border-top:1px solid var(--line);display:flex;gap:6px;align-items:center;flex-wrap:wrap;flex-shrink:0}
+.feedback-bar textarea{resize:vertical;min-height:32px;max-height:160px;flex:1;min-width:160px;background:var(--input);color:var(--text);border:1px solid var(--line);padding:5px}
+.feedback-status{font-size:11px;color:var(--muted)}
+.feedback-hint{width:100%;font-size:10px;color:var(--muted)}
+.source-progress{flex-shrink:0;padding:6px 16px 4px;border-top:1px solid var(--line);font-size:11px;color:var(--muted)}
+.source-progress-caption{display:flex;justify-content:space-between;gap:10px;line-height:18px}
+.source-progress-controls{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.source-progress .source-progress-cancel{padding:0 5px;font-size:11px;line-height:18px}
+.source-progress-track{height:4px;margin-top:3px;background:var(--line);overflow:hidden;border-radius:2px}
+.source-progress-fill{height:100%;width:35%;background:var(--accent);border-radius:2px;opacity:0}
+.source-progress[data-state="running"] .source-progress-fill{opacity:1;animation:source-activity 1.5s ease-in-out infinite alternate}
+@keyframes source-activity{from{transform:translateX(0)}to{transform:translateX(185%)}}
+@media(prefers-reduced-motion:reduce){.source-progress[data-state="running"] .source-progress-fill{animation:none;width:100%;opacity:.6}}
+.feedback-history{flex-shrink:0;max-height:220px;overflow:auto;padding:0 16px;border-top:1px solid var(--line);font-size:12px}
+.feedback-history-controls{display:flex;justify-content:flex-end;padding:4px 0}
+.feedback-item{padding:7px 0;border-bottom:1px solid var(--line)}
+.feedback-item:last-child{border-bottom:0}
+.feedback-item>summary{cursor:pointer;overflow-wrap:anywhere;line-height:1.7}
+.task-state{color:var(--muted);font-size:11px;margin-right:8px}
+.task-state[data-status="queued"],.task-state[data-status="running"]{color:var(--accent);font-weight:600}
+.task-state[data-status="error"],.task-state[data-status="conflict"]{color:var(--error)}
+.feedback-question{color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere;margin:6px 0}
+.feedback-reply{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.7 var(--sans, sans-serif);margin:6px 0}
+.feedback-diff{font:11px/1.6 var(--mono);overflow:auto;margin:6px 0}
+.feedback-diff span{display:block;white-space:pre}
+.diff-add{color:var(--mnemonic);background:var(--hover)}
+.diff-remove{color:var(--error);background:var(--hover)}
+.feedback-changes>summary{cursor:pointer;color:var(--accent);font-size:11px;overflow-wrap:anywhere}
+.queue-jump{border:0;background:none;text-align:left;font:inherit;color:inherit;padding:0;cursor:pointer}
+.queue-jump:hover{color:var(--accent)}
+.queue-functions{padding:2px 0 5px 12px;display:flex;gap:5px 14px;flex-wrap:wrap}
+.queue-functions[hidden]{display:none}
+.queue-functions button{color:var(--accent)}
+.recovery-status{font-size:11px;color:var(--muted);max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.task-queue{flex-shrink:0;border-bottom:1px solid var(--line);background:var(--chrome);font-size:11px;color:var(--muted)}
+.task-queue summary{padding:4px 16px;cursor:pointer}
+.task-queue .clear-tasks{float:right;margin-left:12px;padding:0 6px;font-size:11px}
+.queue-list{max-height:160px;overflow:auto;padding:0 16px 4px}
+.queue-row{display:flex;align-items:center;gap:10px;padding:3px 0;border-top:1px solid var(--line)}
+.queue-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
+.notes{padding:6px 16px;color:var(--muted)}
+.notes pre{white-space:pre-wrap;font:12px/1.6 var(--mono)}
+.candidate-code{margin:0;padding:4px 16px 12px;font:12px/22px var(--mono);white-space:pre;tab-size:4}
+.candidate-code .hljs-keyword,.candidate-code .hljs-literal{color:var(--code-keyword)}
+.candidate-code .hljs-type,.candidate-code .hljs-built_in{color:var(--code-type)}
+.candidate-code .hljs-title{color:var(--mnemonic)}
+.candidate-code .hljs-number{color:var(--number)}
+.candidate-code .hljs-string,.candidate-code .hljs-char.escape_{color:var(--code-string)}
+.candidate-code .hljs-comment{color:var(--code-comment)}
+.candidate-code .hljs-meta{color:var(--address)}
+.function-link{color:inherit;text-decoration:none;cursor:pointer;border-bottom:1px dotted var(--accent)}
+.function-link:hover,.function-link:focus-visible{color:var(--accent);background:var(--hover);outline:none;border-bottom-style:solid}
 .code-head{position:sticky;top:0;z-index:1;background:var(--chrome);color:var(--muted);display:grid;grid-template-columns:112px 116px minmax(400px,1fr);font:10px var(--mono);padding:5px 16px;border-bottom:1px solid var(--line);letter-spacing:.8px;min-width:720px}
 .instruction{display:grid;grid-template-columns:112px 116px minmax(400px,1fr);font:12px/22px var(--mono);padding:0 16px;min-width:720px;white-space:pre}
+.code-views.split .code-head,.code-views.split .instruction{grid-template-columns:96px 84px minmax(280px,1fr);min-width:492px}
 .instruction:hover{background:var(--hover)}
 .instruction:first-child{margin-top:4px}
 .ins-address{color:var(--address)}
@@ -106,7 +175,7 @@ h1{min-width:0;font:500 16px var(--mono);margin:0;overflow:hidden;text-overflow:
 .number{color:var(--number)}
 .message{padding:50px 24px;line-height:1.9;color:var(--muted)}
 .message.error{color:var(--error)}
-.pager{border-top:1px solid var(--line);min-height:28px;padding:4px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.pager{border-top:1px solid var(--line);min-height:28px;padding:4px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0}
 .progress{font:11px/17px var(--mono);color:var(--muted)}
 .load-more{border:1px solid var(--line);border-radius:5px;background:var(--button);color:var(--accent);padding:2px 8px;font-size:11px}
 .load-more:hover:enabled{background:var(--button-hover)}
@@ -140,18 +209,32 @@ footer{height:22px;flex-shrink:0;display:flex;align-items:center;justify-content
 <body>
 <header>
   <div class="brand">Light<span>RE</span><span class="version">0.2</span></div>
-  <div class="sample"><div class="eyebrow">BINARY EXPLORER</div><div id="sample-name" class="sample-name">正在打开样本…</div></div>
+  <div class="sample"><div class="eyebrow">WORKSPACE</div><div id="sample-name" class="sample-name">正在打开工作区…</div></div>
   <div class="header-actions">
+    <span id="recovery-status" class="recovery-status" role="status">候选进度…</span>
+    <button id="resume-recovery" class="load-more" title="处理全部尚无候选的函数">继续还原</button>
+    <button id="stop-recovery" class="load-more" hidden>暂停</button>
     <button id="theme-toggle" class="toolbar-button theme-toggle" aria-label="切换浅色或深色模式">
       <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg>
       <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M20 14.3A8.5 8.5 0 0 1 9.7 4a8.5 8.5 0 1 0 10.3 10.3Z"/></svg>
     </button>
   </div>
 </header>
+<details id="task-queue" class="task-queue"><summary><span id="queue-summary">任务队列</span><button id="clear-tasks" class="load-more clear-tasks" type="button" title="清除已结束任务及回复的展示；日志留档，保留源码和 Knowledge" disabled>清除已结束任务</button></summary><div id="queue-list" class="queue-list"></div></details>
 <div class="layout">
   <aside id="sidebar" aria-label="函数导航">
     <div class="sidebar-heading"><span>函数</span><span id="function-count" class="count">— 已识别</span></div>
     <div class="search-wrap"><span class="search-icon" aria-hidden="true">⌕</span><input id="search" type="search" placeholder="搜索名称或 RVA" aria-label="搜索函数名称或十六进制 RVA" autocomplete="off" spellcheck="false"><button class="clear" id="clear" title="清空搜索" aria-label="清空搜索" hidden>×</button></div>
+    <select id="status-filter" class="status-filter" aria-label="按 LLM 处理状态筛选">
+      <option value="all">全部状态</option>
+      <option value="llm">LLM 已处理 · 有候选</option>
+      <option value="unresolved">已尝试 · 未解决</option>
+      <option value="failed">执行失败 · 待重试</option>
+      <option value="running">正在处理</option>
+      <option value="queued">有排队任务</option>
+      <option value="ghidra">仅 Ghidra 初稿 · 待 LLM</option>
+      <option value="pending">待处理 · 尚无源码</option>
+    </select>
     <div class="columns"><button class="column-sort" id="sort-rva" aria-label="按 RVA 排序" aria-pressed="false">RVA</button><span class="name-label">NAME</span><button class="column-sort" id="sort-lines" title="LINES：汇编指令行数，点击切换排序" aria-label="按汇编行数排序" aria-pressed="true">LINES ↓</button></div>
     <nav class="functions" id="functions" aria-label="已识别函数"><div class="list-empty">正在读取已保存的函数…</div></nav>
     <div class="sidebar-foot" id="list-summary">读取工作区分析结果</div>
@@ -160,22 +243,69 @@ footer{height:22px;flex-shrink:0;display:flex;align-items:center;justify-content
   <main>
     <div class="function-header"><h1 id="function-name">选择一个函数</h1><div class="function-meta"><span>RVA <strong id="function-rva">—</strong></span><span id="instruction-total">ARM64 · 原始汇编</span></div></div>
     <div class="code-tab"><div class="code-tabs" role="tablist" aria-label="函数视图">
-      <button id="tab-assembly" class="view-tab" role="tab" aria-selected="true" aria-controls="code"><span class="tab-icon">≡</span> 汇编</button>
-      <button id="tab-candidate" class="view-tab" role="tab" aria-selected="false" aria-controls="candidate-panel">还原代码</button>
+      <button id="tab-assembly" class="view-tab" role="tab" aria-selected="true" aria-controls="assembly-pane" title="仅显示原始汇编">
+        <svg class="tab-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M7 5h10M7 10h10M7 15h10M3 5h.5M3 10h.5M3 15h.5"/></svg>
+        汇编
+      </button>
+      <button id="tab-candidate" class="view-tab" role="tab" aria-selected="false" aria-controls="candidate-pane" title="仅显示还原源码">
+        <svg class="tab-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M11 2.5H4v15h12v-10L11 2.5v5h5M8 10l-2 2 2 2m4-4 2 2-2 2"/></svg>
+        源码
+      </button>
+      <button id="tab-split" class="view-tab" role="tab" aria-selected="false" aria-controls="assembly-pane candidate-pane" title="左右显示汇编与源码，各自独立滚动">
+        <svg class="tab-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><rect x="2" y="3" width="16" height="14" rx="1.5"/><path d="M10 3v14"/></svg>
+        分栏
+      </button>
     </div><span id="code-note" class="code-note">已保存汇编 · 按地址排列 · 每段最多 200 条</span></div>
-    <div class="code-scroll" id="code-scroll"><div id="assembly-head" class="code-head"><span>RVA</span><span>BYTES</span><span>INSTRUCTION</span></div><div id="code" role="tabpanel" aria-labelledby="tab-assembly"><div class="message">函数识别后将在这里显示原始 ARM64 汇编。</div></div><div id="candidate-panel" role="tabpanel" aria-labelledby="tab-candidate" hidden><div class="message">选择一个函数以查看还原候选。</div></div></div>
-    <div id="assembly-pager" class="pager"><span class="progress" id="progress" role="status">等待选择函数</span><button class="load-more" id="load-more" hidden>重试读取</button></div>
+    <div id="code-views" class="code-views">
+      <section id="assembly-pane" class="code-pane" role="tabpanel" aria-labelledby="tab-assembly">
+        <div class="pane-heading">原始汇编</div>
+        <div class="code-scroll" id="code-scroll"><div id="assembly-head" class="code-head"><span>RVA</span><span>BYTES</span><span>INSTRUCTION</span></div><div id="code"><div class="message">函数识别后将在这里显示原始 ARM64 汇编。</div></div></div>
+        <div id="assembly-pager" class="pager"><span class="progress" id="progress" role="status">等待选择函数</span><button class="load-more" id="load-more" hidden>重试读取</button></div>
+      </section>
+      <div id="code-resizer" class="code-resizer" role="separator" aria-label="调整汇编和源码宽度" aria-orientation="vertical" aria-controls="assembly-pane candidate-pane" tabindex="0" title="左右拖动调整两栏宽度；双击恢复均分；方向键微调" hidden></div>
+      <section id="candidate-pane" class="code-pane" role="tabpanel" aria-labelledby="tab-candidate" hidden>
+        <div class="pane-heading">还原代码</div>
+        <div id="candidate-scroll" class="code-scroll"><div id="candidate-panel"><div class="message">选择一个函数以查看还原候选。</div></div></div>
+        <div id="source-progress" class="source-progress" hidden>
+          <div class="source-progress-caption"><span id="source-progress-text" role="status">当前函数 · 等待选择</span><span class="source-progress-controls"><span id="source-progress-time"></span><button id="cancel-suggestion" class="load-more source-progress-cancel" type="button" title="取消当前建议任务">取消</button></span></div>
+          <div id="source-progress-bar" class="source-progress-track" role="progressbar" aria-label="建议处理活动"><div class="source-progress-fill"></div></div>
+        </div>
+        <section id="feedback-history" class="feedback-history" aria-label="当前函数的建议与回复" hidden></section>
+        <div id="feedback-bar" class="feedback-bar">
+          <textarea id="feedback-comment" rows="1" placeholder="提出修改建议，例如重命名、调整类型或处理逻辑…" aria-label="函数修改建议" aria-describedby="feedback-hint"></textarea>
+          <button id="submit-comment" class="load-more">提交修改建议</button>
+          <span id="feedback-message" class="feedback-status" role="status" aria-live="polite"></span>
+          <span id="feedback-hint" class="feedback-hint">Enter 发送 · Shift+Enter 换行 · 建议进度和回复每 3 秒更新</span>
+        </div>
+      </section>
+    </div>
   </main>
 </div>
 <footer><span id="workspace" title="">外部分析工作区</span><span id="footer-state">ARM64 / RVA</span></footer>
+<script src="/static/highlight-11.11.1.min.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 const hex = n => '0x' + n.toString(16).padStart(8, '0');
 let functions = [], selected = null, loaded = 0, nextOffset = null, requestId = 0, controller, busy = false;
 let sampleState = 'new', refreshTimer, loadFailed = false;
 let sortBy = 'lines', sortDescending = true;
-let activeView = new URLSearchParams(location.search).get('view') === 'candidate' ? 'candidate' : 'assembly';
-let candidateController;
+const viewModes = ['assembly', 'candidate', 'split'];
+let savedView;
+try { savedView = localStorage.getItem('lightre-view'); } catch {}
+const requestedView = new URLSearchParams(location.search).get('view');
+let activeView = viewModes.includes(requestedView) ? requestedView : viewModes.includes(savedView) ? savedView : 'assembly';
+const showsAssembly = () => activeView !== 'candidate';
+const showsCandidate = () => activeView !== 'assembly';
+const viewFooter = () => 'ARM64 / RVA · ' + ({assembly:'原始汇编', candidate:'候选未验证', split:'汇编 / 候选未验证'})[activeView];
+let candidateController, candidateData = null, recoveryTimer;
+let feedbackController, feedbackFingerprint, feedbackSubmitting = false;
+let functionStatuses = {}, activeRvas = new Set(), queuedRvas = new Set(), listStatusFingerprint;
+const statusLabels = {failed:'CLI 执行失败，尚无模型结果；可继续重试', llm:'LLM 已处理，有候选，未经执行验证', unresolved:'有分析记录，尚未解决；可展开分析上下文',
+  running:'LLM 正在处理', queued:'已有排队任务', ghidra:'仅有 Ghidra 初稿，等待 LLM 处理', pending:'待处理，尚无源码', unknown:'正在读取处理状态'};
+const statusSymbols = {failed:'!', llm:'✓', unresolved:'?', running:'◌', queued:'↥', ghidra:'G', pending:'·', unknown:'·'};
+const drafts = new Map();
+const clearingTaskHistory = new Set();
+const cancellingSuggestions = new Set();
 const layout = document.querySelector('.layout'), resizer = $('sidebar-resizer');
 const minSidebarWidth = 220;
 const maxSidebarWidth = 400;
@@ -218,6 +348,56 @@ resizer.onkeydown = event => {
   saveSidebarWidth(); loadNearBottom();
 };
 setSidebarWidth(sidebarWidth);
+
+const codeViews = $('code-views'), codeResizer = $('code-resizer');
+const minSplitRatio = 0.2, maxSplitRatio = 0.8;
+let splitRatio = 0.5, splitDragStart = null;
+try { splitRatio = Number(localStorage.getItem('lightre-split-ratio')) || 0.5; } catch {}
+
+function setSplitRatio(ratio) {
+  splitRatio = Math.max(minSplitRatio, Math.min(maxSplitRatio, Number.isFinite(ratio) ? ratio : 0.5));
+  codeViews.style.setProperty('--assembly-share', splitRatio + 'fr');
+  codeViews.style.setProperty('--candidate-share', (1 - splitRatio) + 'fr');
+  const percent = Math.round(splitRatio * 100);
+  codeResizer.setAttribute('aria-valuemin', minSplitRatio * 100);
+  codeResizer.setAttribute('aria-valuemax', maxSplitRatio * 100);
+  codeResizer.setAttribute('aria-valuenow', percent);
+  codeResizer.setAttribute('aria-valuetext', `汇编 ${percent}%，源码 ${100 - percent}%`);
+}
+function saveSplitRatio() {
+  try { localStorage.setItem('lightre-split-ratio', String(splitRatio)); } catch {}
+}
+function finishSplitDrag() {
+  if (!splitDragStart) return;
+  splitDragStart = null; document.body.classList.remove('resizing-code');
+  saveSplitRatio(); loadNearBottom();
+}
+codeResizer.onpointerdown = event => {
+  if (event.button !== 0 || activeView !== 'split') return;
+  event.preventDefault(); codeResizer.focus();
+  splitDragStart = {x: event.clientX, ratio: splitRatio};
+  codeResizer.setPointerCapture(event.pointerId);
+  document.body.classList.add('resizing-code');
+};
+codeResizer.onpointermove = event => {
+  if (!splitDragStart) return;
+  const width = codeViews.clientWidth - codeResizer.offsetWidth;
+  if (width > 0) setSplitRatio(splitDragStart.ratio + (event.clientX - splitDragStart.x) / width);
+};
+codeResizer.onpointerup = finishSplitDrag;
+codeResizer.onpointercancel = finishSplitDrag;
+codeResizer.onlostpointercapture = finishSplitDrag;
+codeResizer.ondblclick = () => {
+  setSplitRatio(0.5); saveSplitRatio(); loadNearBottom();
+};
+codeResizer.onkeydown = event => {
+  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+  event.preventDefault();
+  setSplitRatio(event.key === 'Home' ? minSplitRatio : event.key === 'End' ? maxSplitRatio :
+    splitRatio + (event.key === 'ArrowLeft' ? -0.02 : 0.02));
+  saveSplitRatio(); loadNearBottom();
+};
+setSplitRatio(splitRatio);
 
 function updateThemeButton() {
   const next = document.documentElement.dataset.theme === 'light' ? '深色' : '浅色';
@@ -265,70 +445,458 @@ function message(text, error = false, target = $('code')) {
 }
 
 function setView(view) {
+  if (!viewModes.includes(view)) return;
   activeView = view;
-  const assembly = view === 'assembly';
-  $('assembly-head').hidden = !assembly; $('code').hidden = !assembly;
-  $('assembly-pager').hidden = !assembly; $('candidate-panel').hidden = assembly;
-  $('tab-assembly').setAttribute('aria-selected', String(assembly));
-  $('tab-candidate').setAttribute('aria-selected', String(!assembly));
-  $('code-note').textContent = assembly ? '已保存汇编 · 按地址排列 · 每段最多 200 条' : '分析候选 · 未经执行验证';
-  $('footer-state').textContent = assembly ? 'ARM64 / RVA · 原始汇编' : 'ARM64 / RVA · 候选未验证';
+  if (view !== 'split') finishSplitDrag();
+  $('code-views').classList.toggle('split', view === 'split');
+  codeResizer.hidden = view !== 'split';
+  $('assembly-pane').hidden = !showsAssembly(); $('candidate-pane').hidden = !showsCandidate();
+  for (const mode of viewModes) $('tab-' + mode).setAttribute('aria-selected', String(mode === view));
+  $('assembly-pane').setAttribute('aria-labelledby', view === 'split' ? 'tab-split' : 'tab-assembly');
+  $('candidate-pane').setAttribute('aria-labelledby', view === 'split' ? 'tab-split' : 'tab-candidate');
+  $('code-note').textContent = ({assembly:'已保存汇编 · 按地址排列 · 每段最多 200 条', candidate:'分析候选 · 未经执行验证', split:'汇编与还原代码 · 独立滚动'})[view];
+  $('footer-state').textContent = viewFooter();
+  try { localStorage.setItem('lightre-view', view); } catch {}
   const url = new URL(location.href);
-  if (assembly) url.searchParams.delete('view'); else url.searchParams.set('view', 'candidate');
+  url.searchParams.set('view', view);
   history.replaceState(null, '', url);
-  $('code-scroll').scrollTop = 0;
   if (selected) {
-    if (assembly) { if (!loaded) loadAssembly(); else loadNearBottom(); }
-    else loadCandidate();
+    if (showsAssembly()) { if (!loaded) loadAssembly(); else loadNearBottom(); }
+    if (showsCandidate()) { loadCandidate(Boolean(candidateData)); refreshFeedback(); }
   }
 }
 
-async function loadCandidate() {
+async function postJSON(url, body = {}) {
+  const response = await fetch(url, {method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  const result = await response.json();
+  if (!response.ok) throw new Error(typeof result.detail === 'string' ? result.detail : `HTTP ${response.status}`);
+  return result;
+}
+
+function functionLink(rva, name) {
+  const link = document.createElement('a'); link.className = 'function-link';
+  link.href = '#' + hex(rva); link.dataset.targetRva = String(rva);
+  link.title = `跳转到 ${name || hex(rva)} · ${hex(rva)}`;
+  link.onclick = event => {
+    if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    const fn = functions.find(item => item.rva === rva);
+    if (fn) selectFunction(fn);
+  };
+  return link;
+}
+
+function linkSourceCalls(code, source, references, openingLength) {
+  const walker = document.createTreeWalker(code, 4), nodes = [];
+  let node, position = 0;
+  while ((node = walker.nextNode())) {
+    nodes.push({node, start:position, end:position + node.textContent.length});
+    position += node.textContent.length;
+  }
+  // Work from right to left so splitting a text node preserves earlier offsets.
+  for (const ref of [...references].sort((a,b) => b.start-a.start)) {
+    if (!Number.isInteger(ref.start) || !Number.isInteger(ref.end) ||
+        source.slice(ref.start, ref.end) !== ref.name) continue;
+    // HTML parsing normalizes CRLF/CR; map backend offsets to displayed text.
+    const first = source.slice(openingLength, ref.start).replace(/\r\n?/g, '\n').length;
+    const last = source.slice(openingLength, ref.end).replace(/\r\n?/g, '\n').length;
+    if (first < 0 || last <= first) continue;
+    const start = nodes.find(item => item.start <= first && first < item.end);
+    const end = nodes.find(item => item.start < last && last <= item.end);
+    if (!start || !end || last-end.start > end.node.textContent.length) continue;
+    const range = document.createRange();
+    range.setStart(start.node, first-start.start); range.setEnd(end.node, last-end.start);
+    const link = functionLink(ref.target_rva, ref.name);
+    link.append(range.extractContents()); range.insertNode(link);
+  }
+}
+
+function renderSourceCode(source, references = []) {
+  const code = document.createElement('pre'); code.className = 'candidate-code';
+  if (source == null) {
+    code.textContent = '批量任务会尝试还原这个函数；无法确定的逻辑会记录在分析上下文中。';
+    return code;
+  }
+  // Hide empty opening lines for reading; keep indentation and all later text.
+  const trimmed = source.replace(/^(?:[ \t]*\r?\n)+/, '');
+  const text = trimmed.replace(/\r\n?/g, '\n');
+  code.textContent = text;
+  if (typeof hljs !== 'undefined') {
+    // highlight.js escapes source text before producing its span markup.
+    try { code.innerHTML = hljs.highlight(text, {language: 'cpp', ignoreIllegals: true}).value; } catch {}
+  }
+  if (references.length) linkSourceCalls(code, source, references, source.length-trimmed.length);
+  return code;
+}
+
+async function loadCandidate(quiet = false) {
   if (!selected) return;
   candidateController?.abort();
   const pending = new AbortController(); candidateController = pending;
   const id = requestId;
-  message('正在读取还原候选…', false, $('candidate-panel'));
+  if (!quiet) message('正在读取还原候选…', false, $('candidate-panel'));
   try {
     const data = await getJSON(`/api/functions/${hex(selected.rva)}/candidate`, pending.signal);
     if (id !== requestId || candidateController !== pending) return;
-    if (data.status === 'missing') {
-      message('尚未还原。让 Agent 分析并保存这个函数的候选后，刷新页面即可查看。', false, $('candidate-panel'));
-      return;
-    }
+    if (quiet && candidateData && data.sha256 === candidateData.sha256 &&
+        data.notes === candidateData.notes && data.path === candidateData.path && data.status === candidateData.status &&
+        JSON.stringify(data.references) === JSON.stringify(candidateData.references)) return;
+    candidateData = data;
+    $('function-name').textContent = data.source_name || selected.name;
+    const scrollPosition = $('candidate-scroll').scrollTop;
+    const notesExpanded = $('candidate-panel').querySelector('details')?.open;
     const meta = document.createElement('div'); meta.className = 'candidate-meta';
-    const status = document.createElement('strong'); status.textContent = '分析候选，未验证';
+    const status = document.createElement('strong'); status.textContent = data.status === 'reference' ? 'Ghidra 初稿，尚未经过 LLM' : data.code ? 'LLM 分析候选，未经执行验证' : '尚无候选 · 等待分析或尚未解决';
     const path = document.createElement('div'); path.textContent = data.path;
     meta.append(status, path);
-    const code = document.createElement('pre'); code.className = 'candidate-code'; code.textContent = data.code;
+    const code = renderSourceCode(data.display_code, data.references || []);
     $('candidate-panel').replaceChildren(meta, code);
+    if (data.notes) {
+      const details = document.createElement('details'); details.className = 'notes'; details.open = Boolean(notesExpanded);
+      const summary = document.createElement('summary'); summary.textContent = '函数说明 / 分析上下文';
+      const notes = document.createElement('pre'); notes.textContent = data.notes;
+      details.append(summary, notes); $('candidate-panel').append(details);
+    }
+    if (quiet) $('candidate-scroll').scrollTop = scrollPosition;
   } catch (error) {
     if (id !== requestId || candidateController !== pending || error.name === 'AbortError') return;
-    message(`候选读取失败：${error.message}。可点击“还原代码”重试。`, true, $('candidate-panel'));
+    candidateData = null;
+    message(error.message, true, $('candidate-panel'));
   }
+}
+
+async function submitFeedback() {
+  if (!selected || !candidateData || feedbackSubmitting) return;
+  const address = selected.rva, id = requestId;
+  const comment = $('feedback-comment').value;
+  if (!comment.trim()) {
+    $('feedback-message').textContent = '请填写修改建议';
+    return;
+  }
+  feedbackSubmitting = true;
+  $('submit-comment').disabled = true; $('submit-comment').textContent = '发送中…';
+  $('feedback-message').textContent = '正在提交建议…';
+  try {
+    const result = await postJSON(`/api/functions/${hex(address)}/feedback`, {
+      expected_sha256: candidateData.sha256, comment
+    });
+    if (drafts.get(address) === comment) drafts.delete(address);
+    if (id === requestId) {
+      if ($('feedback-comment').value === comment) $('feedback-comment').value = '';
+      $('feedback-message').textContent = '建议已提交';
+      $('task-queue').open = true;
+      await Promise.all([loadCandidate(true), refreshFeedback()]);
+    }
+    refreshRecovery();
+  } catch (error) {
+    if (id === requestId) $('feedback-message').textContent = error.message;
+  } finally {
+    feedbackSubmitting = false;
+    $('submit-comment').disabled = false; $('submit-comment').textContent = '提交修改建议';
+  }
+}
+
+function suggestionWaiting(item) {
+  return ({same_function:'等待同一函数的前序任务', capacity:'并发名额已满，等待空闲', dispatch:'正在调度建议'})[item.wait_reason] ||
+    `建议已排队 · 前方 ${item.ahead} 条任务`;
+}
+
+function feedbackState(item, paused) {
+  if (item.status === 'queued') return paused ? '队列已暂停 · 等待继续' : suggestionWaiting(item);
+  if (item.status === 'running') return `正在处理 · 已运行 ${item.elapsed_seconds} 秒`;
+  if (item.status === 'cancelled') return '已取消';
+  if (item.status === 'interrupted') return '任务中断 · 等待继续';
+  if (item.status === 'error') return '执行失败';
+  if (item.error && !item.result) return '执行失败 · 未修改';
+  const outcome = item.result?.outcome;
+  return ({updated:'已修改源码', unchanged:'源码未修改 · 已回复', unresolved:'暂未解决 · 未修改',
+    conflict:'源码已被其他任务更新 · 本次未覆盖', unrecorded:'历史回复 · 未记录改动快照'})[outcome] ||
+    (item.status === 'partial' ? '本轮未解决' : '本轮结束 · 未记录独立回复');
+}
+
+function renderSourceProgress(data) {
+  for (const item of data.items) {
+    if (!['running', 'queued'].includes(item.status)) cancellingSuggestions.delete(item.id);
+  }
+  const suggestion = data.items.find(item => item.status === 'running') ||
+    data.items.find(item => item.status === 'queued');
+  $('source-progress').hidden = !suggestion || data.paused;
+  if ($('source-progress').hidden) return;
+  const running = suggestion.status === 'running';
+  const cancel = $('cancel-suggestion');
+  cancel.dataset.taskId = suggestion.id || '';
+  cancel.disabled = !suggestion.id || cancellingSuggestions.has(suggestion.id);
+  cancel.textContent = cancellingSuggestions.has(suggestion.id) ? '取消中…' : '取消';
+  $('source-progress').dataset.state = suggestion.status;
+  const activity = suggestion.activity;
+  const label = running ? activity?.label || '正在处理建议' : suggestionWaiting(suggestion);
+  $('source-progress-text').textContent = label;
+  $('source-progress').title = activity?.detail || '';
+  const silent = activity?.silent_seconds >= 15 ? ` · ${activity.silent_seconds} 秒无新输出` : '';
+  $('source-progress-time').textContent = running ? `已用 ${suggestion.elapsed_seconds || 0} 秒${silent}` : '';
+  $('source-progress-bar').setAttribute('aria-valuetext', label);
+}
+
+async function cancelCurrentSuggestion() {
+  const button = $('cancel-suggestion'), identifier = button.dataset.taskId, address = selected?.rva;
+  if (!identifier || cancellingSuggestions.has(identifier)) return;
+  cancellingSuggestions.add(identifier);
+  button.disabled = true; button.textContent = '取消中…';
+  try {
+    await postJSON(`/api/tasks/${encodeURIComponent(identifier)}/cancel`);
+    await refreshRecovery();
+  } catch (error) {
+    cancellingSuggestions.delete(identifier);
+    if (button.dataset.taskId === identifier) { button.disabled = false; button.textContent = '取消'; }
+    if (selected?.rva === address) $('feedback-message').textContent = `取消失败：${error.message}`;
+  }
+}
+
+async function clearTaskHistory(rva = null, button = $('clear-tasks')) {
+  const key = rva ?? 'all';
+  if (clearingTaskHistory.has(key) || clearingTaskHistory.has('all')) return;
+  clearingTaskHistory.add(key);
+  const label = button.textContent;
+  button.disabled = true; button.textContent = '清理中…';
+  let cleared = false;
+  try {
+    await postJSON(rva == null ? '/api/tasks/clear' : `/api/functions/${hex(rva)}/feedback/clear`);
+    feedbackFingerprint = null; cleared = true;
+  } catch (error) {
+    if (rva == null) $('recovery-status').textContent = `清理失败：${error.message}`;
+    else if (selected?.rva === rva) $('feedback-message').textContent = `清理失败：${error.message}`;
+  } finally {
+    clearingTaskHistory.delete(key);
+    feedbackFingerprint = null;
+    const current = rva == null ? $('clear-tasks') : selected?.rva === rva ?
+      $('feedback-history').querySelector('.feedback-history-controls button') : null;
+    for (const target of new Set([button, current].filter(Boolean))) {
+      target.disabled = clearingTaskHistory.has('all'); target.textContent = label;
+    }
+  }
+  if (cleared) await refreshRecovery();
+}
+
+async function refreshFeedback() {
+  if (!selected || !showsCandidate()) return;
+  feedbackController?.abort();
+  const pending = new AbortController(); feedbackController = pending;
+  const id = requestId, address = selected.rva;
+  try {
+    const data = await getJSON(`/api/functions/${hex(address)}/feedback`, pending.signal);
+    if (id !== requestId || feedbackController !== pending) return;
+    if (data.current_sha256 && data.current_sha256 !== candidateData?.sha256 && !$('feedback-comment').value.trim()) {
+      await loadCandidate(true);
+      if (id !== requestId || feedbackController !== pending) return;
+    }
+    const fingerprint = JSON.stringify(data);
+    if (fingerprint === feedbackFingerprint) return;
+    renderSourceProgress(data);
+    const panel = $('feedback-history'), scroll = panel.scrollTop;
+    const expanded = new Map(Array.from(panel.querySelectorAll('[data-task-id]')).map(el => [el.dataset.taskId, el.open]));
+    const expandedDiffs = new Map(Array.from(panel.querySelectorAll('[data-diff-id]')).map(el => [el.dataset.diffId, el.open]));
+    const fragment = document.createDocumentFragment();
+    if (data.items.some(item => ['complete','partial','error','cancelled'].includes(item.status))) {
+      const controls = document.createElement('div'); controls.className = 'feedback-history-controls';
+      const clear = document.createElement('button'); clear.className = 'load-more'; clear.type = 'button';
+      clear.textContent = '清除已结束回复'; clear.title = '清除当前函数的临时回复展示，保留 Knowledge 和函数说明';
+      clear.disabled = clearingTaskHistory.has(address) || clearingTaskHistory.has('all');
+      clear.onclick = () => clearTaskHistory(address, clear);
+      controls.append(clear); fragment.append(controls);
+    }
+    data.items.forEach((item, index) => {
+      const card = document.createElement('details'); card.className = 'feedback-item'; card.dataset.taskId = item.id;
+      card.open = expanded.has(item.id) ? expanded.get(item.id) : index === 0;
+      const summary = document.createElement('summary');
+      const badge = document.createElement('span'); badge.className = 'task-state'; badge.dataset.status = item.result?.outcome === 'conflict' ? 'conflict' : item.status;
+      badge.textContent = feedbackState(item, data.paused);
+      const question = document.createElement('span'); question.textContent = item.comment.replace(/\s+/g, ' ').slice(0, 70);
+      summary.append(badge, question); summary.title = `建议 ${item.id}`;
+      const original = document.createElement('div'); original.className = 'feedback-question'; original.textContent = `你的建议：${item.comment}`;
+      card.append(summary, original);
+      if (item.result) {
+        const reply = document.createElement('pre'); reply.className = 'feedback-reply'; reply.textContent = item.result.reply;
+        card.append(reply);
+        if (item.result.diff) {
+          const changes = document.createElement('details'); changes.className = 'feedback-changes'; changes.dataset.diffId = item.id;
+          changes.open = expandedDiffs.get(item.id) || false;
+          const title = document.createElement('summary');
+          title.textContent = `查看本次修改 · +${item.result.added_lines} / −${item.result.removed_lines} 行 · ${item.result.path}`;
+          const diff = document.createElement('pre'); diff.className = 'feedback-diff';
+          for (const [index, line] of item.result.diff.split('\n').entries()) {
+            const row = document.createElement('span'); row.textContent = line;
+            if (index > 1 && line.startsWith('+')) row.className = 'diff-add';
+            if (index > 1 && line.startsWith('-')) row.className = 'diff-remove';
+            diff.append(row);
+          }
+          changes.append(title, diff); card.append(changes);
+        }
+        if (item.result.current_matches === false) {
+          const notice = document.createElement('div'); notice.className = 'feedback-question';
+          notice.textContent = '源码后来又有更新；这里保留的是本次任务的回复和改动。'; card.append(notice);
+        }
+      }
+      if (item.error || item.result_error) {
+        const error = document.createElement('div'); error.className = 'feedback-question'; error.textContent = item.error || item.result_error; card.append(error);
+      }
+      fragment.append(card);
+    });
+    panel.replaceChildren(fragment); panel.hidden = !data.items.length; panel.scrollTop = scroll;
+    feedbackFingerprint = fingerprint;
+  } catch (error) {
+    if (id !== requestId || feedbackController !== pending || error.name === 'AbortError') return;
+    $('source-progress-text').textContent = '当前函数 · 进度读取失败，将自动重试';
+    $('feedback-message').textContent = `建议进度读取失败，将自动重试：${error.message}`;
+  }
+}
+
+async function refreshRecovery() {
+  clearTimeout(recoveryTimer);
+  try {
+    const data = await getJSON('/api/recovery'), task = data.task;
+    const running = !data.paused && ['queued','running'].includes(task.status);
+    const labels = {idle:'空闲', queued:'排队中', running:'分析中', complete:'本轮完成', partial:'有未解决函数', error:'分析出错', interrupted:'已暂停', cancelled:'已取消'};
+    const phases = {ghidra:'Ghidra 分析中', source:'整理模块与初稿'};
+    const concurrency = data.concurrency || {in_use:task.active_batches || 0, limit:task.effective_workers || task.workers};
+    $('recovery-status').textContent = `源码 ${data.source_functions}/${data.total} · LLM ${data.candidates} · 未解决 ${data.unresolved || 0}${data.failed ? ` · 执行失败 ${data.failed}` : ''} · ${data.paused ? '队列已暂停' : running && phases[task.phase] || labels[task.status] || task.status}` +
+      (running && concurrency.limit ? ` · 并发 ${concurrency.in_use}/${concurrency.limit}` : '') + (data.queued ? ` · 排队 ${data.queued}` : '');
+    $('recovery-status').title = task.error || task.ghidra?.error || (task.directory ? `日志与任务：${task.directory}` : '');
+    $('stop-recovery').hidden = !running;
+    const interrupted = task.status === 'interrupted' || (data.queue || []).some(job => job.status === 'interrupted');
+    $('resume-recovery').hidden = !data.paused && (running || data.candidates === data.total && !data.queued && !interrupted);
+    const waiting = (data.queue || []).filter(job => job.status === 'queued').flatMap(job => {
+      const done = new Set(job.done_rvas || []); return (job.rvas || []).filter(rva => !done.has(rva));
+    });
+    renderQueue(data);
+    if (showsCandidate()) await refreshFeedback();
+    const current = (data.queue || [task]).filter(job => job.status === 'running').flatMap(job => job.current || []);
+    const listFingerprint = JSON.stringify([data.function_statuses, running ? current : [], waiting]);
+    if (listFingerprint !== listStatusFingerprint) {
+      functionStatuses = data.function_statuses || {};
+      activeRvas = new Set(running ? current.map(rva => Number.parseInt(rva, 16)) : []);
+      queuedRvas = new Set(waiting);
+      listStatusFingerprint = listFingerprint;
+      const scrollTop = $('functions').scrollTop;
+      renderList(); $('functions').scrollTop = scrollTop;
+    }
+    if (showsCandidate() && !$('feedback-comment').value.trim()) await loadCandidate(true);
+  } catch (error) {
+    $('recovery-status').textContent = '进度读取失败'; $('recovery-status').title = error.message;
+  }
+  recoveryTimer = setTimeout(refreshRecovery, 3000);
+}
+
+async function controlRecovery(stop = false) {
+  try {
+    await postJSON(stop ? '/api/recovery/stop' : '/api/recovery');
+    await refreshRecovery();
+  } catch (error) { $('recovery-status').textContent = error.message; }
+}
+
+async function selectTaskFunction(rva, showIssue = false) {
+  const fn = functions.find(item => item.rva === rva);
+  if (!fn) return;
+  if (!showsCandidate()) setView('candidate');
+  await selectFunction(fn);
+  if (showIssue && selected?.rva === rva) {
+    const notes = $('candidate-panel').querySelector('details');
+    if (notes) notes.open = true;
+  }
+}
+
+function renderQueue(data) {
+  const jobs = data.queue || [];
+  $('clear-tasks').disabled = clearingTaskHistory.has('all') || !jobs.some(job => ['complete','partial','error','cancelled'].includes(job.status));
+  const expanded = new Map(Array.from($('queue-list').querySelectorAll('.queue-functions'))
+    .filter(item => !item.hidden).map(item => [item.dataset.taskId, item.dataset.scope]));
+  const pending = jobs.filter(job => ['queued','running','interrupted'].includes(job.status));
+  $('queue-summary').textContent = `任务队列 · 执行中 ${jobs.filter(job => job.status === 'running').length} · 等待 ${data.queued || 0}` + (data.paused ? ' · 已暂停' : ' · 建议优先');
+  const states = {queued:'等待', running:'执行中', interrupted:'已暂停', complete:'完成', partial:'有未解决项', error:'失败', cancelled:'已取消'};
+  const recent = jobs.filter(job => !pending.includes(job)).sort((a,b) => b.created_at-a.created_at).slice(0, 5);
+  const fragment = document.createDocumentFragment();
+  for (const job of [...pending, ...recent]) {
+    const entry = document.createElement('div');
+    const row = document.createElement('div'); row.className = 'queue-row';
+    const rvas = [...new Set(job.rvas || [])].filter(rva => functions.some(fn => fn.rva === rva));
+    const issues = new Map((job.issues || []).map(item => [item.rva, item]));
+    const issueRvas = rvas.filter(rva => issues.has(rva));
+    const chooser = document.createElement('div'); chooser.className = 'queue-functions'; chooser.hidden = true;
+    chooser.dataset.taskId = job.id;
+    const navigate = (targets, showIssue) => {
+      if (targets.length === 1) { selectTaskFunction(targets[0], showIssue); return; }
+      const key = JSON.stringify(targets), open = chooser.hidden || chooser.dataset.targets !== key;
+      chooser.hidden = !open; chooser.dataset.targets = key;
+      chooser.dataset.scope = showIssue ? 'issues' : 'all';
+      if (!open) return;
+      chooser.replaceChildren(...targets.map(rva => {
+        const button = document.createElement('button'); button.className = 'queue-jump'; button.type = 'button';
+        const issue = issues.get(rva);
+        button.dataset.rva = String(rva);
+        button.textContent = hex(rva) + (issue ? issue.status === 'failed' ? ' · 执行失败' : ' · 未解决' : '');
+        button.title = issue?.reason || functions.find(fn => fn.rva === rva).name;
+        button.onclick = () => selectTaskFunction(rva, Boolean(issue));
+        return button;
+      }));
+    };
+    const label = document.createElement(rvas.length ? 'button' : 'span'); label.className = 'queue-label';
+    if (rvas.length) { label.classList.add('queue-jump'); label.onclick = () => navigate(rvas, false); }
+    label.textContent = (job.mode === 'comment' ? `评论 ${hex(job.rvas[0])} · ${job.comment}` :
+      `${job.mode === 'targeted' ? '定向分析' : '首轮分析'} · ${job.total} 个入口`);
+    label.title = `${job.id}\n${job.directory}\n${job.comment || ''}`;
+    const targets = job.issues?.length ? issueRvas : rvas;
+    const status = document.createElement(targets.length ? 'button' : 'span');
+    status.textContent = `${states[job.status] || job.status} · ${job.processed || 0}/${job.total}${job.failed_count ? ` · 执行失败 ${job.failed_count}` : ''}`;
+    if (targets.length) {
+      status.className = 'queue-jump';
+      status.title = targets.length === 1 ? `查看函数 ${hex(targets[0])} 及分析记录` : '展开相关函数，按 RVA 选择';
+      status.onclick = () => navigate(targets, true);
+    }
+    const restored = expanded.get(job.id) === 'issues' ? targets : rvas;
+    if (expanded.has(job.id) && restored.length > 1) navigate(restored, expanded.get(job.id) === 'issues');
+    row.append(label, status);
+    if (['queued','running','interrupted'].includes(job.status)) {
+      const cancel = document.createElement('button'); cancel.className = 'load-more'; cancel.textContent = '取消';
+      cancel.onclick = async () => {
+        cancel.disabled = true;
+        try { await postJSON(`/api/tasks/${job.id}/cancel`); await refreshRecovery(); }
+        catch (error) { $('recovery-status').textContent = error.message; cancel.disabled = false; }
+      };
+      row.append(cancel);
+    }
+    entry.append(row, chooser); fragment.append(entry);
+  }
+  if (!jobs.length) fragment.append(document.createTextNode('暂无任务'));
+  $('queue-list').replaceChildren(fragment);
 }
 
 function renderList() {
   const query = $('search').value.trim().toLowerCase();
+  const filter = $('status-filter').value;
   const addressQuery = query.replace(/^0x/, '').replace(/^0+/, '') || '0';
-  const visible = functions.filter(f => !query || f.name.toLowerCase().includes(query) ||
-    hex(f.rva).includes(query) || f.rva.toString(16).includes(addressQuery)).sort(compareFunctions);
+  const visible = functions.filter(f => (filter === 'all' || (filter === 'running' ? activeRvas.has(f.rva) :
+    filter === 'queued' ? queuedRvas.has(f.rva) : functionStatuses[f.rva] === filter)) && (!query || f.name.toLowerCase().includes(query) ||
+    hex(f.rva).includes(query) || f.rva.toString(16).includes(addressQuery))).sort(compareFunctions);
   $('clear').hidden = !query;
   const fragment = document.createDocumentFragment();
   for (const fn of visible) {
+    const status = activeRvas.has(fn.rva) ? 'running' : queuedRvas.has(fn.rva) ? 'queued' : functionStatuses[fn.rva] || 'unknown';
     const row = document.createElement('button'); row.className = 'function'; row.dataset.rva = fn.rva;
-    row.setAttribute('aria-current', String(selected?.rva === fn.rva)); row.title = `${fn.name} · ${hex(fn.rva)} · ${fn.instructions.toLocaleString()} 行汇编`;
+    row.setAttribute('aria-current', String(selected?.rva === fn.rva)); row.title = `${fn.name} · ${hex(fn.rva)} · ${fn.instructions.toLocaleString()} 行汇编 · ${statusLabels[status]}`;
     const address = document.createElement('span'); address.className = 'addr'; address.textContent = hex(fn.rva);
-    const name = document.createElement('span'); name.className = 'name'; name.textContent = fn.name;
+    const name = document.createElement('span'); name.className = 'name';
+    const marker = document.createElement('span'); marker.className = 'function-status'; marker.dataset.status = status;
+    marker.textContent = statusSymbols[status]; marker.setAttribute('aria-label', statusLabels[status]);
+    const nameText = document.createElement('span'); nameText.className = 'name-text'; nameText.textContent = fn.name;
+    name.append(marker, nameText);
     const lines = document.createElement('span'); lines.className = 'lines'; lines.textContent = fn.instructions.toLocaleString();
     row.append(address, name, lines); row.onclick = () => selectFunction(fn); fragment.append(row);
   }
   if (!visible.length) {
     const empty = document.createElement('div'); empty.className = 'list-empty';
-    empty.textContent = query ? '没有匹配的函数。试试名称片段或十六进制 RVA。' : sampleState === 'ready' ? '当前没有已保存的函数。' : '正在读取函数…'; fragment.append(empty);
+    empty.textContent = query || filter !== 'all' ? '没有匹配的函数。可调整搜索或状态筛选。' : sampleState === 'ready' ? '当前没有已保存的函数。' : '正在读取函数…'; fragment.append(empty);
   }
   $('functions').replaceChildren(fragment);
-  $('list-summary').textContent = query ? `${visible.length} / ${functions.length} 个匹配` :
+  $('list-summary').textContent = query || filter !== 'all' ? `${visible.length} / ${functions.length} 个匹配` :
     `按${sortBy === 'lines' ? '行数' : ' RVA '}${sortDescending ? '降序' : '升序'} · 每条指令计一行`;
 }
 
@@ -344,26 +912,42 @@ function renderInstruction(op) {
     const part = document.createElement('span'); part.textContent = token;
     part.className = /^(?:[xwvsdqbh]\d+|sp|wsp|xzr|wzr|lr|fp)$/i.test(token) ? 'reg' : /^(?:0x[\da-f]+|\d+)$/i.test(token) ? 'number' : 'operand'; code.append(part);
   }
+  if (Number.isInteger(op.target_rva)) {
+    const link = functionLink(op.target_rva);
+    while (code.childNodes.length > 1) link.append(code.childNodes[1]);
+    code.append(link);
+  }
   row.append(addr, bytes, code); return row;
 }
 
-async function selectFunction(fn) {
-  controller?.abort(); candidateController?.abort(); requestId++; selected = fn; loaded = 0; nextOffset = 0; busy = false; loadFailed = false;
-  history.replaceState(null, '', '#' + hex(fn.rva));
+async function selectFunction(fn, recordHistory = true) {
+  const previous = selected;
+  controller?.abort(); candidateController?.abort(); feedbackController?.abort(); requestId++; selected = fn;
+  feedbackFingerprint = null; $('feedback-history').replaceChildren(); $('feedback-history').hidden = true;
+  $('source-progress').hidden = true;
+  candidateData = null; $('feedback-comment').value = drafts.get(fn.rva) || ''; $('feedback-message').textContent = '';
+  loaded = 0; nextOffset = 0; busy = false; loadFailed = false;
+  const url = new URL(location.href); url.hash = hex(fn.rva);
+  if (recordHistory && previous && previous.rva !== fn.rva) history.pushState(null, '', url);
+  else history.replaceState(null, '', url);
   $('function-name').textContent = fn.name; $('function-rva').textContent = hex(fn.rva);
   $('instruction-total').textContent = `${fn.instructions.toLocaleString()} 条指令 · ARM64`;
-  $('code-scroll').scrollTop = 0; renderList(); message('正在读取已保存的汇编…');
-  if (activeView === 'assembly') await loadAssembly(); else await loadCandidate();
+  for (const id of ['code-scroll', 'candidate-scroll']) { $(id).scrollTop = 0; $(id).scrollLeft = 0; }
+  renderList(); message('正在读取已保存的汇编…');
+  const reads = [];
+  if (showsAssembly()) reads.push(loadAssembly());
+  if (showsCandidate()) reads.push(loadCandidate(), refreshFeedback());
+  await Promise.all(reads);
 }
 
 function loadNearBottom() {
-  if (activeView !== 'assembly') return;
+  if (!showsAssembly()) return;
   const scroll = $('code-scroll');
   if (!loadFailed && scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight <= 250) loadAssembly();
 }
 
 async function loadAssembly() {
-  if (activeView !== 'assembly' || !selected || nextOffset === null || busy) return;
+  if (!showsAssembly() || !selected || nextOffset === null || busy) return;
   const id = requestId, offset = nextOffset; busy = true; loadFailed = false; controller = new AbortController();
   $('load-more').hidden = true;
   $('progress').textContent = offset ? '正在加载后续指令…' : '正在读取…';
@@ -409,8 +993,8 @@ async function refreshFunctions() {
     } else if (selected) {
       const updated = functions.find(f => f.rva === selected.rva);
       if (updated && (updated.instructions !== selected.instructions || updated.name !== selected.name)) selectFunction(updated);
-    } else if (sample.state === 'ready') message('Rizin 未识别出函数。可以让 Agent 继续调查这个样本。');
-    $('footer-state').textContent = activeView === 'assembly' ? 'ARM64 / RVA · 原始汇编' : 'ARM64 / RVA · 候选未验证';
+    } else if (sample.state === 'ready') message('分析工具未识别出函数。可以让 Agent 继续调查这个样本。');
+    $('footer-state').textContent = viewFooter();
     if (!['ready','error'].includes(sample.state)) refreshTimer = setTimeout(refreshFunctions, 1500);
   } catch (error) {
     $('footer-state').textContent = '连接失败，正在重试';
@@ -419,18 +1003,39 @@ async function refreshFunctions() {
     refreshTimer = setTimeout(refreshFunctions, 3000);
   }
 }
+$('feedback-comment').oninput = () => { if (selected) drafts.set(selected.rva, $('feedback-comment').value); };
+$('feedback-comment').addEventListener('keydown', event => {
+  if (event.key !== 'Enter' || event.shiftKey || event.isComposing || event.keyCode === 229) return;
+  event.preventDefault();
+  if (!event.repeat) submitFeedback();
+});
+$('submit-comment').onclick = submitFeedback;
+$('clear-tasks').onclick = event => { event.preventDefault(); event.stopPropagation(); clearTaskHistory(); };
+$('cancel-suggestion').onclick = cancelCurrentSuggestion;
+$('resume-recovery').onclick = () => controlRecovery();
+$('stop-recovery').onclick = () => controlRecovery(true);
 $('search').addEventListener('input', renderList);
+$('status-filter').addEventListener('change', renderList);
 $('sort-rva').onclick = () => setSort('rva');
 $('sort-lines').onclick = () => setSort('lines');
 $('clear').onclick = () => { $('search').value = ''; renderList(); $('search').focus(); };
 $('load-more').onclick = loadAssembly;
 $('tab-assembly').onclick = () => setView('assembly');
 $('tab-candidate').onclick = () => setView('candidate');
+$('tab-split').onclick = () => setView('split');
 $('code-scroll').addEventListener('scroll', loadNearBottom, {passive: true});
 window.addEventListener('resize', () => { setSidebarWidth(sidebarWidth); loadNearBottom(); });
 document.addEventListener('keydown', event => { if ((event.ctrlKey || event.metaKey) && event.key === 'k') { event.preventDefault(); $('search').focus(); } });
+function selectAddressFromHistory() {
+  const rva = Number.parseInt(location.hash.slice(1), 16);
+  const fn = functions.find(item => item.rva === rva);
+  if (fn && selected?.rva !== rva) selectFunction(fn, false);
+}
+window.addEventListener('popstate', selectAddressFromHistory);
+window.addEventListener('hashchange', selectAddressFromHistory);
 setView(activeView);
 refreshFunctions();
+refreshRecovery();
 </script>
 </body>
 </html>
