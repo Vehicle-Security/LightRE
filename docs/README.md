@@ -1,12 +1,14 @@
 # 文档入口与职责
 
-先按问题选择文档。版本计划决定本次开发范围，专题设计说明具体机制，交付记录说明已经验证到哪里；长期设计存在不代表能力已经实现。V0.2 已于 2026-11-01 通过用户人工验收，V0.31 是下一小步计划，V0.3 保留为后续完整闭环的总体方案。
+先按问题选择文档。版本计划决定本次开发范围，专题设计说明具体机制，交付记录说明已经验证到哪里；长期设计存在不代表能力已经实现。V0.2 已于 2026-11-01 通过用户人工验收，V0.31 已开始开发，尚待人工验收，V0.3 保留为后续完整闭环的总体方案。
 
 ## 本次开发先读什么
 
 - **使用当前功能**：[V0.2 使用说明与 API](milestones/v0.2/USAGE.md)。
 - **核对当前版本范围和结果**：[V0.2 计划](milestones/v0.2/PLAN.md)、[交付记录](milestones/v0.2/DELIVERY.md)。
 - **开发 V0.31**：[本版计划](milestones/v0.31/PLAN.md) → [loop 的结果保存与交接](GOAL_LOOP.md#最小落地先完整保存返回正文) → [harness 的位置与复用](LLM_DECOMPILER_DESIGN.md#agent-生成与共享-unidbg-harness)。先完成简单 SO 的 harness 和该任务的修复循环。
+- **接入任意 harness**：[通用执行契约](HARNESS_CONTRACT.md)，显式配置入口、用例、独立检查器与产物；核心不识别样本。
+- **运行已适配的 DG/minilua**：[目标 harness：配置、说明与真实证据](TARGET_HARNESSES.md)，使用原 workspace，单边运行不代表差分完成。
 - **了解后续顺序**：[路线图](IMPLEMENTATION_PLAN.md)与 [V0.3 总体方案](milestones/v0.3/PLAN.md)。DG 使用现有 `.bin`，minilua 使用 `.lua`；真实目标适配、候选构建和双边差分继续分步推进。
 
 无需每次开发都通读全部长期设计；按当前问题再读取相关专题与需求编号。
@@ -37,7 +39,9 @@
 | [v0.2/USAGE.md](milestones/v0.2/USAGE.md) | 当前功能的操作、参数、目录与本地 API |
 | [v0.2/TASK_QUEUE.md](milestones/v0.2/TASK_QUEUE.md) | 已有批量分析与评论队列的持久化、调度和状态；不是工程 Goal Loop |
 | [v0.3/PLAN.md](milestones/v0.3/PLAN.md) | 单函数差分与语义修复的总体方案，分步实现，不是下一小版本的全部交付范围 |
-| [v0.31/PLAN.md](milestones/v0.31/PLAN.md) | 下一个小版本：最小 unidbg harness 与原文交接的修复循环，尚未实现 |
+| [v0.31/PLAN.md](milestones/v0.31/PLAN.md) | 最小 unidbg harness 与原文交接的修复循环，已实现开发版，尚待人工验收 |
+| [v0.31/USAGE.md](milestones/v0.31/USAGE.md) | 测试库准备、运行、重放、修复及取消/恢复命令 |
+| [v0.31/DELIVERY.md](milestones/v0.31/DELIVERY.md) | 真实 unidbg、Codex 修复及轻量检查的开发记录 |
 
 ## 修改与核对规则
 

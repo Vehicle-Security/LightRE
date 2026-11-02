@@ -1,6 +1,6 @@
 # ARM64 unidbg 动态差分
 
-状态：设计方案，尚未实现或实测。当前按用户确定的范围只处理 ARM64，动态执行统一使用 unidbg，minilua 也走这条路径。V0.3 是真实目标差分修复闭环的总体方向；先拆出 [V0.31 最小 harness 与任务循环](milestones/v0.31/PLAN.md)，验证简单测试 SO 的纯 native 运行与重放，并接通完整结果保存、实际检查与失败续做。DG JNI、minilua 适配及双边差分分别后移。
+状态：设计方案，尚未实现或实测。当前按用户确定的范围只处理 ARM64，动态执行统一使用 unidbg，minilua 也走这条路径。V0.3 是真实目标差分修复闭环的总体方向；先拆出 [V0.31 最小 harness 与任务循环](milestones/v0.31/PLAN.md)，验证简单测试 SO 的纯 native 运行与重放，并接通完整结果保存、实际检查与失败续做。用户随后授权的 DG JNI 与 minilua Android SO 单边运行已实现，实际状态见 [目标 harness](TARGET_HARNESSES.md)；双边差分仍待实现。
 
 本文维护执行、用例、状态、观察和比较契约；多轮调度与交接见 [Goal Loop](GOAL_LOOP.md)，harness 的目录与共享规则见 [总体架构](LLM_DECOMPILER_DESIGN.md#agent-生成与共享-unidbg-harness)。本次实现范围以版本 PLAN 为准，文档分工见 [文档入口](README.md)。
 
@@ -137,6 +137,10 @@ Agent 继续补充边界、变异及针对未探索路径的输入；仅反复�
 
 因此为 minilua 另建 Android ARM64 SO 测试版本，作为独立分析目标。保留已有 Linux 样本和记录，不修改扩展名伪装 SO，也不尝试在当前范围内补齐一套 glibc 模拟环境。使用 Android NDK 或兼容的 Android 交叉工具链构建，固定实际工具版本、API 与依赖，并验证所选 unidbg 环境能够加载和执行。
 
+这项改造属于 minilua 源码项目。薄 C 接口、必要的条件编译及 Android 构建配置维护在 `LightRE/samples/minilua/` 内：接口源码放入其 `src/`，构建脚本放入其 `scripts/`，用例及构建说明也随该项目保存。按原有源码与构建组织同时保留 Linux 交付方式。不能把这份适配源码作为 workspace 中另一套 minilua 工程维护，也不放进 LightRE 的通用执行器或 native-smoke 样例。
+
+构建得到的 Android SO 再作为新分析目标导入原 `/work2/minilua-analysis`，使用自己的哈希、SO 子目录和原始文件副本。外部 workspace 中的 `harnesses/minilua/` 负责 Java/unidbg 加载与调用，所选 SO 的 `runs/` 保存输入快照、日志和结果；它们不承担 minilua 源码改造的归属。源码适配、Java 调用与运行记录分别保存，仍只维护一份 minilua 适配源码。
+
 具体小步如下：
 
 1. 为 minilua 增加薄 C 测试入口，准备 Lua 状态、从内存加载 Lua 输入、执行并提取明确结果。首批合法字节码由匹配的解析器生成，并保存源码种子、实际 Proto 指令、常量、子函数及必要上下文的可定位依据。接口不要求 JNI；初期正常初始化可由 SO 内部完成，避免 Java harness 手工拼装复杂 Lua 内存。
@@ -158,7 +162,7 @@ Agent 继续补充边界、变异及针对未探索路径的输入；仅反复�
 
 已有可重放运行后可开展输入变异；有可执行候选后开展差分。强制执行与变异字节码按 [开发路线](IMPLEMENTATION_PLAN.md) 引入，仍保留干预性质、有效前态和相同变异程序的比较约束。
 
-总体闭环按小版本实现：V0.31 先建立 ARM64 unidbg 纯 native harness 和原文交接的最小修复 loop；随后单独选择 DG JNI 适配或上述 minilua SO 适配，再接双边运行和普通函数形式的公共比较逻辑。当前不接入 Qiling、其他架构或多后端抽象；Android minilua SO 构建与 unidbg 运行仍待实现和实测。
+总体闭环按小版本实现：V0.31 先建立 ARM64 unidbg 纯 native harness 和原文交接的最小修复 loop；随后单独选择 DG JNI 适配或上述 minilua SO 适配，再接双边运行和普通函数形式的公共比较逻辑。当前不接入 Qiling、其他架构或多后端抽象；Android minilua SO 构建与单边 unidbg 运行已按后续授权实现和实测，见 [目标 harness](TARGET_HARNESSES.md)；本节其他差分能力仍为设计。
 
 ## 上游能力依据
 

@@ -8,7 +8,7 @@ Web 服务于可选的结果查看和反馈，自动化逆向不依赖 UI 操作
 
 当前 V0.2 按最新用户反馈只验收 Ghidra 直接反编译、一轮 LLM 保守整理与 Web 审阅，允许保留混淆结构及已记录的反编译局限；新任务不自动追加深入分析。上面的去混淆、VM 业务语义恢复和等价工程交付为后续目标，本版不以完成这些能力为前置。具体范围见 [V0.2 计划](milestones/v0.2/PLAN.md)，已于 2026-11-01 通过用户人工验收。
 
-下一小步为 [V0.31](milestones/v0.31/PLAN.md)：在已知源码的小型 Android ARM64 测试 SO 上实现 unidbg 整数/缓冲区调用、运行记录与重放，再用最小 Python loop 修复 harness；测试库、固定预期和检查器不由模型修改。它只实现长期运行与循环需求的一个子集，不包含真实 VM 适配、候选编译或双边差分。[V0.3](milestones/v0.3/PLAN.md) 保留为后续总体方案，按小步扩展。
+正在开发的 [V0.31](milestones/v0.31/PLAN.md)：在已知源码的小型 Android ARM64 测试 SO 上实现 unidbg 整数/缓冲区调用、运行记录与重放，再用最小 Python loop 修复 harness；测试库、固定预期和检查器不由模型修改。它只实现长期运行与循环需求的一个子集，不包含真实 VM 适配、候选编译或双边差分。运行与 harness 修复入口已接入，使用及真实检查见 [USAGE](milestones/v0.31/USAGE.md) 和 [DELIVERY](milestones/v0.31/DELIVERY.md)，尚待用户人工验收。[V0.3](milestones/v0.3/PLAN.md) 保留为后续总体方案，按小步扩展。
 
 动态执行当前限定 ARM64 + unidbg，Qiling 延期。后续真实目标使用现有输入：DG 的 4 份 `.bin`，以及 minilua 的 `.lua` 用例；后者由自身解析器生成内部字节码，不以外部 luac 加载器为前置。minilua 需另建 Android ARM64 SO，现有 Linux glibc ELF 不能直接作为 Android SO 使用。具体适配与比较契约见 [动态差分设计](DIFFERENTIAL_EXECUTION.md)。
 

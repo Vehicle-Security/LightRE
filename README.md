@@ -2,7 +2,7 @@
 
 # LightRE
 
-LightRE 是面向 ARM64 SO 的逆向分析工具，首要目标是恢复 VM 混淆中的真实业务逻辑，重点处理其中的控制流平坦化和 MBA（混合布尔算术）混淆。以 Agent Skill 为入口，结合 Ghidra 和 Codex，目标是交付可编译、可独立运行、可继续维护的等价源码工程。静态调查、unidbg 动态实验、表达式化简与差分验证的联合方案见 [核心分析路线](docs/LLM_DECOMPILER_DESIGN.md#vm控制流平坦化与-mba)；动态与求解能力尚未接入。
+LightRE 是面向 ARM64 SO 的逆向分析工具，首要目标是恢复 VM 混淆中的真实业务逻辑，重点处理其中的控制流平坦化和 MBA（混合布尔算术）混淆。以 Agent Skill 为入口，结合 Ghidra 和 Codex，目标是交付可编译、可独立运行、可继续维护的等价源码工程。静态调查、unidbg 动态实验、表达式化简与差分验证的联合方案见 [核心分析路线](docs/LLM_DECOMPILER_DESIGN.md#vm控制流平坦化与-mba)；面向真实 VM 的动态与求解能力尚未接入。
 
 当前 V0.2 范围为 Ghidra 直接反编译、一轮 LLM 保守整理与 Web 评论续做。允许保留平坦化、goto、MBA 和 Ghidra 类型，去混淆及 VM 语义恢复留到后续版本；新任务不自动追加深入分析。V0.2 已于 2026-11-01 通过用户人工验收；DG 核心巨函数尚无 C 候选，按用户决定留到后续差分阶段处理。范围与实跑记录见 [V0.2 交付记录](docs/milestones/v0.2/DELIVERY.md)。
 
@@ -12,7 +12,9 @@ LightRE 是面向 ARM64 SO 的逆向分析工具，首要目标是恢复 VM 混�
 
 长期自动化以 [Goal Loop](docs/GOAL_LOOP.md) 为支柱：一次提交目标，由 Python 循环调用 `codex exec`，根据实际构建、运行与回归结果自动续做，直至通过交付检查。该闭环尚在规划；现有功能提供静态分析、源码候选与可选的 Web 审阅。
 
-下一小步 [V0.31](docs/milestones/v0.31/PLAN.md) 先做简单 Android ARM64 测试 SO 的 unidbg harness、结果保存与重放，以及每轮独立 exec、完整保存返回和反馈真实失败的 harness 修复 loop，尚未实现。真实目标适配、候选构建和双边差分按 [V0.3 总体方案](docs/milestones/v0.3/PLAN.md) 后续分步加入。
+正在开发的 [V0.31](docs/milestones/v0.31/PLAN.md) 已接入简单 Android ARM64 测试 SO 的 unidbg harness、结果保存与重放，以及每轮独立 exec、完整保存返回和反馈真实失败的 harness 修复 loop，尚待人工验收。操作见 [V0.31 使用说明](docs/milestones/v0.31/USAGE.md)，实际检查见 [交付记录](docs/milestones/v0.31/DELIVERY.md)。用户随后授权的 DG JNI 与 minilua Android SO 运行适配已加入，命令、真实证据和环境限制见 [目标 harness](docs/TARGET_HARNESSES.md)。通用核心与目标规则已拆分，接入新目标见 [harness 执行契约](docs/HARNESS_CONTRACT.md)。候选构建和双边差分按 [V0.3 总体方案](docs/milestones/v0.3/PLAN.md) 后续加入。
+
+运行环境为 Ubuntu 24 Linux 容器。系统依赖统一通过 `bash scripts/install_deps.sh` 安装，包含 Ghidra、匹配的 JDK、Maven、Clang、LLD 与格式化工具；仅准备 unidbg 运行环境可用 `--runtime-only`；构建 Android minilua 使用同一入口的 `--android`，安装 LLVM14 与官方 NDK Bionic sysroot。容器内 Codex 默认使用 `danger-full-access`，无需嵌套 namespace。
 
 让 Codex 读取项目中的 [SKILL.md](SKILL.md)，描述目标目录或二进制文件即可，无需全局安装 Skill：
 

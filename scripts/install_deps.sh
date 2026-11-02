@@ -10,6 +10,8 @@ GHIDRA_HOME="$TOOLS_DIR/ghidra"
 GHIDRA_URL="${GHIDRA_URL:-}"
 INSTALL_GHIDRA=true
 INSTALL_RIZIN=false
+INSTALL_RUNTIME=true
+INSTALL_ANDROID=false
 
 die() {
   printf 'error: %s\n' "$*" >&2
@@ -42,15 +44,23 @@ has_ghidra() {
 }
 
 has_java() {
-  local major required=25
+  local major compiler_major required=17
 
-  if [[ -f "$GHIDRA_HOME/Ghidra/application.properties" ]]; then
-    required="$(sed -n 's/^application.java.min=//p' "$GHIDRA_HOME/Ghidra/application.properties")"
+  if "$INSTALL_GHIDRA"; then
+    required=25
+    if [[ -f "$GHIDRA_HOME/Ghidra/application.properties" ]]; then
+      required="$(sed -n 's/^application.java.min=//p' "$GHIDRA_HOME/Ghidra/application.properties")"
+    fi
   fi
 
   command -v java >/dev/null 2>&1 || return 1
   major="$(java -version 2>&1 | sed -n 's/.*version "\([0-9][0-9]*\).*/\1/p' | head -n 1)"
-  [[ "$major" =~ ^[0-9]+$ ]] && (( major >= required ))
+  [[ "$major" =~ ^[0-9]+$ ]] && (( major >= required )) || return 1
+  if "$INSTALL_RUNTIME"; then
+    command -v javac >/dev/null 2>&1 || return 1
+    compiler_major="$(javac -version 2>&1 | sed -n 's/^javac \([0-9][0-9]*\).*/\1/p' | head -n 1)"
+    [[ "$compiler_major" =~ ^[0-9]+$ ]] && (( compiler_major >= 17 ))
+  fi
 }
 
 has_build_dependencies() {
@@ -59,13 +69,23 @@ has_build_dependencies() {
   for command_name in curl git python3 unzip make gcc g++ bison flex clang-format; do
     command -v "$command_name" >/dev/null 2>&1 || return 1
   done
-  python3 -c 'import markdown_it' >/dev/null 2>&1 || return 1
+  python3 -c 'import ensurepip, markdown_it' >/dev/null 2>&1 || return 1
+  if "$INSTALL_RUNTIME"; then
+    for command_name in javac mvn clang ld.lld; do
+      command -v "$command_name" >/dev/null 2>&1 || return 1
+    done
+  fi
   if "$INSTALL_RIZIN"; then
     for command_name in meson ninja pkg-config; do
       command -v "$command_name" >/dev/null 2>&1 || return 1
     done
   fi
-  ! "$INSTALL_GHIDRA" || has_java
+  if "$INSTALL_ANDROID"; then
+    for command_name in clang-14 llvm-config-14 opt-14 llc-14 cmake ninja patch readelf; do
+      command -v "$command_name" >/dev/null 2>&1 || return 1
+    done
+  fi
+  { ! "$INSTALL_GHIDRA" && ! "$INSTALL_RUNTIME"; } || has_java
 }
 
 as_root() {
@@ -79,9 +99,17 @@ as_root() {
 }
 
 install_system_packages() {
-  local java_packages=() rizin_packages=()
+  local java_packages=() rizin_packages=() runtime_packages=()
   if "$INSTALL_GHIDRA"; then
     java_packages=(openjdk-25-jdk)
+  elif "$INSTALL_RUNTIME"; then
+    java_packages=(default-jdk)
+  fi
+  if "$INSTALL_RUNTIME"; then
+    runtime_packages=(maven clang lld)
+  fi
+  if "$INSTALL_ANDROID"; then
+    runtime_packages+=(clang-14 llvm-14-dev cmake ninja-build patch binutils)
   fi
   if "$INSTALL_RIZIN"; then
     rizin_packages=(meson ninja-build pkg-config libcapstone-dev liblz4-dev libzip-dev
@@ -92,9 +120,10 @@ install_system_packages() {
   log "安装 Ubuntu 24.04 依赖"
   as_root apt-get update
   as_root apt-get install -y \
-    ca-certificates curl git python3 python3-markdown-it unzip \
+    ca-certificates curl git python3 python3-venv python3-markdown-it unzip \
     "${java_packages[@]}" \
-    build-essential bison flex clang-format zlib1g-dev "${rizin_packages[@]}"
+    build-essential bison flex clang-format zlib1g-dev \
+    "${runtime_packages[@]}" "${rizin_packages[@]}"
 }
 
 build_rizin_from_source() {
@@ -128,6 +157,32 @@ install_rizin() {
   fi
 
   build_rizin_from_source
+}
+
+has_android_sysroot() {
+  local ndk="$TOOLS_DIR/android-ndk-r27d"
+  [[ -f "$ndk/source.properties" &&
+     -f "$ndk/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/android/api-level.h" &&
+     -f "$ndk/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/23/libc.so" ]]
+}
+
+install_android_sysroot() {
+  # Use the native host Clang/LLD, including on aarch64 Linux. NDK's x86 compiler
+  # is not executed; only the official Bionic headers and target libraries are used.
+  has_android_sysroot && { log 'Android NDK r27d sysroot 已存在'; return; }
+  local archive="$TOOLS_DIR/cache/android-ndk-r27d-linux.zip"
+  mkdir -p "$TOOLS_DIR/cache"
+  if [[ ! -f "$archive" ]]; then
+    log '下载 Android NDK r27d（仅提取 sysroot，不运行 x86_64 编译器）'
+    curl -fsSL --retry 3 -o "$archive.part" \
+      https://dl.google.com/android/repository/android-ndk-r27d-linux.zip
+    mv "$archive.part" "$archive"
+  fi
+  # Checksum published in Google's repository2-1.xml for ndk;27.3.13750724.
+  printf '%s  %s\n' '22105e410cf29afcf163760cc95522b9fb981121' "$archive" | sha1sum -c -
+  unzip -q -o "$archive" 'android-ndk-r27d/source.properties' \
+    'android-ndk-r27d/toolchains/llvm/prebuilt/linux-x86_64/sysroot/*' -d "$TOOLS_DIR"
+  has_android_sysroot || die 'Android sysroot 提取不完整'
 }
 
 resolve_ghidra_url() {
@@ -205,13 +260,16 @@ main() {
   case "$*" in
     "") ;;
     --with-rizin) INSTALL_RIZIN=true ;;
-    --rizin-only) INSTALL_GHIDRA=false; INSTALL_RIZIN=true ;;
-    *) die "用法：bash scripts/install_deps.sh [--with-rizin | --rizin-only]" ;;
+    --runtime-only) INSTALL_GHIDRA=false ;;
+    --android) INSTALL_GHIDRA=false; INSTALL_ANDROID=true ;;
+    --rizin-only) INSTALL_GHIDRA=false; INSTALL_RIZIN=true; INSTALL_RUNTIME=false ;;
+    *) die "用法：bash scripts/install_deps.sh [--with-rizin | --runtime-only | --android | --rizin-only]" ;;
   esac
   cd -- "$PROJECT_DIR"
   mkdir -p "$TOOLS_DIR"
 
   if { ! "$INSTALL_RIZIN" || has_rizin; } && { ! "$INSTALL_GHIDRA" || has_ghidra; } && has_build_dependencies; then
+    if "$INSTALL_ANDROID"; then install_android_sysroot; fi
     log "所需工具及其依赖都已存在，跳过安装"
     return 0
   fi
@@ -224,6 +282,7 @@ main() {
     install_ghidra
     prepare_ghidra_native
   fi
+  if "$INSTALL_ANDROID"; then install_android_sysroot; fi
 
   log "安装完成"
   if "$INSTALL_GHIDRA"; then
@@ -237,6 +296,11 @@ main() {
   if "$INSTALL_GHIDRA"; then
     printf '  %q\n' "$GHIDRA_HOME/support/analyzeHeadless"
   fi
+  if "$INSTALL_RUNTIME"; then
+    printf '  java -version\n  javac -version\n  mvn -version\n  clang --version\n  ld.lld --version\n'
+  fi
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi

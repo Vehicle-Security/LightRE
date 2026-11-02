@@ -40,9 +40,11 @@ minilua 的运行环境需单独区分：仓库现有 small/large 交付物是�
 
 统一的 ARM64 unidbg 用例、观察和比较方式，以及 minilua SO 适配步骤见 [动态差分设计](../../DIFFERENTIAL_EXECUTION.md)。公共比较逻辑通过普通函数在目标间复用，harness 按目标准备状态，不为暂未需要的运行器预建抽象。
 
+minilua 的薄 C 接口、条件编译、Android SO 构建脚本及相关用例在原 `samples/minilua/` 源码项目内维护；构建后的 SO 导入原分析 workspace，Java/unidbg harness 与运行记录保存在该 workspace。不将 minilua 适配源码放到通用工具模块或另外复制到 workspace。
+
 候选构建产物保存为当前 SO 分析目录下的 `runs/<build_run_id>/build/libcandidate.so`，同一 Run 保存固定源码输入依据、命令、工具链、选项、日志与产物哈希；差分任务显式引用该产物。每次新构建独立保存，原始 `binary/original.so` 保持不变。该构建保存流程尚未实现。
 
-构建与修复采用功能模块内的 [构建与验证 workflow](../../../src/recovery/prompts/BUILD_AND_VERIFY.md)：一次 Codex exec 内可以持续修改、编译、加载调用和修复；外层 Python 按真实产物与差分结果决定是否续跑。V0.31 先实现 harness 任务的续跑与原文交接，0.3-B 接入候选构建、ELF/ABI 与双边运行检查，0.3-C 扩展为差分失败反馈和累计反例回归。workflow 已提供，执行器及实际运行能力仍待实现，不能以模型说“编译成功”作为验收。
+构建与修复采用功能模块内的 [构建与验证 workflow](../../../src/recovery/prompts/BUILD_AND_VERIFY.md)：一次 Codex exec 内可以持续修改、编译、加载调用和修复；外层 Python 按真实产物与差分结果决定是否续跑。V0.31 先实现 harness 任务的续跑与原文交接，0.3-B 接入候选构建、ELF/ABI 与双边运行检查，0.3-C 扩展为差分失败反馈和累计反例回归。完整差分 workflow 仍待接入；V0.31 的测试 SO 运行和 harness 修复执行器已开始实现，见其 [交付记录](../v0.31/DELIVERY.md)，不能以模型说“编译成功”作为验收。
 
 运行记录从本版开始区分合法字节码基线、输入/字节码变异及强制实验，并保存虚拟程序、业务输入、前态和干预依据。底座供三类实验复用；具备具体运行边界后可以开展定点强制实验，不要求先恢复完整字节码生成器。系统性的 fuzz/强制探索自动化按后续阶段展开，不能把它们误解为差分的必经前置或必须等待全 VM 恢复的最后一步。
 

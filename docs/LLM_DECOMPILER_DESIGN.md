@@ -462,6 +462,10 @@ Web 评论发起的任务沿用同一迭代流程：Agent 读取评论、代码�
 
 Harness 按实际兼容的一组 SO 共享，放在用户选择的 `workspace/harnesses/<name>/`，不放进 LightRE 工具仓库，也不按 SO 的哈希复制工程。同一应用或库的多个版本可以复用兼容的 JNI 与初始化代码；差异用当前 SO 的少量参数或普通 Java 分支处理，差异很大时才另建 harness。它是普通 Maven 工程，不是插件或继承体系；LightRE 通用代码只负责启动和收集输出。
 
+现有 DG 与 minilua 复用各自原来的 workspace，使用两个不同的目标 harness：DG 放在 `/work2/dC6BDAE-analysis/harnesses/dg/`，实现其实际需要的 JNI、Java 对象和初始化；minilua 放在 `/work2/minilua-analysis/harnesses/minilua/`，通过 Android ARM64 SO 的薄 C 接口直接调用，不引入 JNI。各 SO 子目录的 `harness.json` 分别关联对应工程，Run 保存在该 SO 的 `runs/`。这些路径说明后续目标适配的归属，不表示两个目标 harness 已实现。native-smoke 是开发自测样例，不能作为这两个目标的运行工程或运行证据。
+
+minilua 为支持 unidbg 所需的薄 C 接口、条件编译、Android SO 构建配置及用例，归属其原源码项目 `samples/minilua/`；workspace 只保存 harness、导入的目标与运行产物，不另存一套可编辑 minilua 适配源码。具体归属和导入方式见 [动态差分设计](DIFFERENTIAL_EXECUTION.md#minilua另建-android-arm64-so统一使用-unidbg)。
+
 ```text
 <用户选择的 workspace>/
   harnesses/example-lib/
@@ -500,6 +504,8 @@ Harness 按实际兼容的一组 SO 共享，放在用户选择的 `workspace/ha
 
 Harness 的创建和修复可以作为 Codex 任务：先读取已有关联；没有时检查可复用的 harness、导出签名和输入资料，适配或生成最小工程，再编译运行。有 JNI 依赖时才调查签名并按缺口补全。V0.31 先实现纯 C 固定测试库的明确导出调用，不建设任意 ABI/RVA 调用器。成功完成选定入口实验后再记录该 SO 的兼容情况；失败时保存缺口和下一步，不要求人工预先提供可运行工程，也不保证从 SO 自动恢复全部 Java 依赖。选择和适配交给 Agent，不开发自动匹配服务。
 
+每个工程根目录维护 `HARNESS.md` 作为专用操作说明。新建时先生成，已有时先读取并核对目标适用性，修复前更新适配计划，再同步入口 ABI、初始化、参数、命令、依据与缺口。V0.31 已接入固定测试库的准备/运行/修复流程，并提供 `guide --target --instructions` 使用目标说明生成明确待适配的文档；生成说明不等于真实目标可运行。当前说明的最近检查区由外层依据真实报告更新，执行前说明随源码进入 Run 并参与内容核对；重放使用历史副本，旧无说明的 Run 不补写。
+
 `TargetHarness` 负责建立 ARM64 Android 模拟环境，按样本依赖加载 SO、执行必要初始化，再调用选定入口。纯 C 目标不要求创建 Dalvik VM、实现 JNI 或调用 `JNI_OnLoad`；后续 DG 适配按实际依赖加入这些步骤。minilua 后续以薄 C 接口加载 `.lua` 并调用自身解析器，另行构建 Android SO，不能直接复用现有 Linux glibc ELF。初始化顺序是样本逻辑的一部分，不要求所有函数都能从任意状态独立调用。纯 C 导出按已知符号和签名调用；JNI 导出或动态注册的方法按类名和签名调用；内部函数支持后再按模块加载基址与 RVA 定位，显式准备 ABI 参数和所需状态。
 
 `TargetJni` 集中实现这些版本所依赖的类、方法、字段和对象状态。例如签名 `android/content/Context->getPackageName()Ljava/lang/String;` 可从当前 SO 的参数返回包名；影响逻辑的 Java 方法需要相应实现或有来源的实验输入。存在 APK 时可以用于类信息、资源及包信息，但不代表 unidbg 会自动执行其中任意 Java/Dex 方法。
@@ -510,7 +516,7 @@ Harness 的创建和修复可以作为 Codex 任务：先读取已有关联；�
 
 共享 harness 是 Codex 持续修改的唯一工作版本，同一工程的生成和修改先串行处理。Run 中的副本只用于复现历史，不作为第二份可编辑主版本。执行前保存实际源码、pom 和当前 SO 参数的小型副本，并从该副本构建运行；输入、命令和实际工具版本随 Run 保存，原始 SO 身份从该 SO 的 SQLite 元数据读取。依赖 SO、APK 和大型资源按路径与哈希引用，保留用过的原文件，内容变化则另存文件；不复制 Maven 依赖缓存或整个构建目录，也不为每个 SO 维护独立源码分支。
 
-所有输入路径相对所选 SO 分析目录解析，执行入口显式传入该目录，不依赖 Java 进程的当前目录。重放旧 Run 使用保存的 harness、参数与输入，不能默默改用共享工程的当前版本。运行接口与使用方法记在 harness 的 README，具体 JNI 假设、运行缺口和函数前置状态记在该 SO 的知识中。一个版本的运行证据不自动成为另一个版本的证据，共享代码后仍需对目标版本验证。不另建 JNI 数据库、跨版本证据同步或代码继承系统。
+所有输入路径相对所选 SO 分析目录解析，执行入口显式传入该目录，不依赖 Java 进程的当前目录。重放旧 Run 使用保存的 harness、参数与输入，不能默默改用共享工程的当前版本。运行接口与适配方法记在 harness 的 HARNESS.md，具体 JNI 假设、运行缺口和函数前置状态记在该 SO 的知识中并由说明引用。一个版本的运行证据不自动成为另一个版本的证据，共享代码后仍需对目标版本验证。不另建 JNI 数据库、跨版本证据同步或代码继承系统。
 
 ## Web 评论到 Codex 执行
 

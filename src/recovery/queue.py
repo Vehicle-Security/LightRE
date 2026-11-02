@@ -45,6 +45,10 @@ def snapshot(reader):
             created_at = path.stat().st_mtime
         except FileNotFoundError:
             continue
+        if state.get('mode') == 'harness':
+            # Native harness tasks have their own foreground executor. Sharing
+            # the SO lock must not enqueue them as v0.2 candidate batches.
+            continue
         state.setdefault('directory', str(root / state['id']))
         state.setdefault('priority', 0 if state.get('mode') == 'comment' else 10)
         if 'created_at' not in state:

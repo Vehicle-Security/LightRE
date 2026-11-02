@@ -4,9 +4,9 @@
 
 本文规划交付步骤。V0.1 已作为基础版本提交，本轮人工验收反馈已落实；最终实现和现场记录以 [V0.1 milestone](milestones/v0.1/DELIVERY.md) 为准。V0.2 的自动初次还原与人工反馈已于 2026-11-01 通过用户人工验收，见 [V0.2 交付记录](milestones/v0.2/DELIVERY.md)与[确认范围](milestones/v0.2/PLAN.md)。代码调整和开发自测不推进产品版本。长期方向见 [设计文档](LLM_DECOMPILER_DESIGN.md)，功能需求见 [需求清单](REQUIREMENTS.md)。
 
-当前可运行版本为 V0.2，基于 V0.1 增加自动初次还原与人工反馈；其余增量按反馈选择。Workspace 是外层分析根目录，每份 SO 使用自己的分析子目录、SQLite 与知识，具体约定见设计文档的“开发基线”。
+当前已验收版本为 V0.2，基于 V0.1 增加自动初次还原与人工反馈；其余增量按反馈选择。Workspace 是外层分析根目录，每份 SO 使用自己的分析子目录、SQLite 与知识，具体约定见设计文档的“开发基线”。
 
-按最新反馈，先交付 [V0.31：最小 unidbg harness 与任务循环](milestones/v0.31/PLAN.md)：用简单 Android ARM64 测试 SO 跑通整数调用、缓冲区读写、结果保存与独立重放；同时接入最小 Python loop，逐轮完整保存 Codex 返回，按 harness 实际检查结果反馈续做。DG 的 JNI 环境、minilua 的 Android SO 适配分别后移，先不承担候选编译、双边差分和语义自动修复。[V0.3](milestones/v0.3/PLAN.md) 保留为完整闭环的总体方案，不再一次性交付。当前只调整计划，尚未开发或验收，不改变 V0.2 的验收状态。
+按最新反馈，先交付 [V0.31：最小 unidbg harness 与任务循环](milestones/v0.31/PLAN.md)：用简单 Android ARM64 测试 SO 跑通整数调用、缓冲区读写、结果保存与独立重放；同时接入最小 Python loop，逐轮完整保存 Codex 返回，按 harness 实际检查结果反馈续做。DG 的 JNI 环境、minilua 的 Android SO 适配分别后移，先不承担候选编译、双边差分和语义自动修复。[V0.3](milestones/v0.3/PLAN.md) 保留为完整闭环的总体方案，不再一次性交付。V0.31 已开始开发，运行与修复入口见 [使用说明](milestones/v0.31/USAGE.md)，实际证据见 [交付记录](milestones/v0.31/DELIVERY.md)，尚待人工验收；V0.2 的验收状态保持不变。
 
 当前动态路线已收敛为 ARM64 + unidbg。minilua 另建 Android ARM64 SO 与薄 C 测试接口，复用同一运行和差分流程；DG 按需补充 JNI。保留原 Linux 样本，当前不接入 Qiling 或其他架构，不建设多后端运行平台。
 
@@ -95,7 +95,7 @@ P0/P1/P2 是长期需求分组，不是需要一次完成的交付包。没有�
 
 当前范围是 Ghidra 初稿加一轮 LLM 保守整理、完整汇编回退与显式纯汇编输入，以及 Web 审阅续做；候选未经动态验证，允许保留混淆结构。范围和验收条件见 [PLAN](milestones/v0.2/PLAN.md)，实际结果与缺口见 [DELIVERY](milestones/v0.2/DELIVERY.md)，操作、参数及本地 API 见 [USAGE](milestones/v0.2/USAGE.md)，批量和评论调度见 [TASK_QUEUE](milestones/v0.2/TASK_QUEUE.md)。不在本文复制批次限时、输入协议或队列兼容策略。
 
-## V0.31：最小 unidbg harness 与任务循环（计划）
+## V0.31：最小 unidbg harness 与任务循环（开发中，待人工验收）
 
 下一个小步用简单 Android ARM64 SO 验证纯 native 调用与重放，接入完整保存 Codex 返回、按真实检查反馈续做的最小 loop。具体开发顺序、输入来源、验收和后移范围只维护在 [V0.31 PLAN](milestones/v0.31/PLAN.md)。
 
