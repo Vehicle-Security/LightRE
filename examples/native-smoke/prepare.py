@@ -1,4 +1,4 @@
-"""Prepare the fixed, freestanding Android test library and editable harness."""
+"""Prepare a fixed Android test SO; rehost must generate its harness from scratch."""
 
 import argparse
 import sys
@@ -8,7 +8,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'src'))
 
 from workspace import PROJECT_DIR, prepare_workspace
-from execution.guide import ensure
 from execution.process import execute, succeeded
 from execution.storage import digest, read_json, write_json
 
@@ -43,26 +42,6 @@ def prepare(workspace):
                                    'compiler': read_json(build / 'compiler/execution.json'),
                                    'build': execution})
     directory = prepare_workspace(binary, workspace, name='native-smoke')
-    harness = workspace / 'harnesses/native-smoke'
-    # Instructions precede source generation and survive later preparations.
-    ensure(harness, 'native-smoke', instructions=EXAMPLE / 'ADAPTATION.md')
-    if not (harness / 'pom.xml').exists():
-        for path in (EXAMPLE / 'harness').rglob('*'):
-            if path.is_file():
-                target = harness / path.relative_to(EXAMPLE / 'harness')
-                target.parent.mkdir(parents=True, exist_ok=True)
-                if not target.exists():
-                    shutil.copyfile(path, target)
-    association = directory / 'harness.json'
-    config = {'path': '../harnesses/native-smoke', 'cases': str(EXAMPLE / 'cases.json'),
-              'checker': str(EXAMPLE / 'checker.py'), 'artifacts': [],
-              'parameters': {'main_class': 'lightre.NativeHarness'},
-              'protected_files': [str(build / 'build.json'), str(build / 'native_smoke.c')]}
-    if association.exists():
-        previous = read_json(association)
-        if any(previous.get(key, value) != value for key, value in config.items()):
-            raise ValueError('Existing fixture association differs; review it explicitly')
-    write_json(association, config)
     return directory
 
 

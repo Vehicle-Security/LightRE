@@ -1,18 +1,1 @@
-BasedOnStyle: LLVM
-IndentWidth: 4
-UseTab: Never
-ColumnLimit: 100
-BreakBeforeBraces: Attach
-AllowShortFunctionsOnASingleLine: Empty
-AllowShortIfStatementsOnASingleLine: Never
-AllowShortLoopsOnASingleLine: false
-MaxEmptyLinesToKeep: 1
-KeepEmptyLinesAtTheStartOfBlocks: false
-PointerAlignment: Right
-DerivePointerAlignment: false
-SortIncludes: Never
-SortUsingDeclarations: Never
-IncludeBlocks: Preserve
-ReflowComments: false
-BreakStringLiterals: false
-FixNamespaceComments: false
+src/lightre/resources/clang-format

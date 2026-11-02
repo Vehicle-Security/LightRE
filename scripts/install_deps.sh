@@ -4,7 +4,7 @@ set -Eeuo pipefail
 
 SCRIPT_DIR="$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")"
 PROJECT_DIR="$(dirname -- "$SCRIPT_DIR")"
-TOOLS_DIR="$PROJECT_DIR/tools"
+TOOLS_DIR="${LIGHTRE_TOOLS_DIR:-$PROJECT_DIR/tools}"
 RIZIN_HOME="$TOOLS_DIR/rizin"
 GHIDRA_HOME="$TOOLS_DIR/ghidra"
 GHIDRA_URL="${GHIDRA_URL:-}"
@@ -69,7 +69,7 @@ has_build_dependencies() {
   for command_name in curl git python3 unzip make gcc g++ bison flex clang-format; do
     command -v "$command_name" >/dev/null 2>&1 || return 1
   done
-  python3 -c 'import ensurepip, markdown_it' >/dev/null 2>&1 || return 1
+  python3 -c 'import ensurepip' >/dev/null 2>&1 || return 1
   if "$INSTALL_RUNTIME"; then
     for command_name in javac mvn clang ld.lld; do
       command -v "$command_name" >/dev/null 2>&1 || return 1
@@ -120,7 +120,7 @@ install_system_packages() {
   log "安装 Ubuntu 24.04 依赖"
   as_root apt-get update
   as_root apt-get install -y \
-    ca-certificates curl git python3 python3-venv python3-markdown-it unzip \
+    ca-certificates curl git python3 python3-venv unzip \
     "${java_packages[@]}" \
     build-essential bison flex clang-format zlib1g-dev \
     "${runtime_packages[@]}" "${rizin_packages[@]}"

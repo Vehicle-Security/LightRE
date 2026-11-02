@@ -1,4 +1,6 @@
-## 目标适配：minilua（Android SO，纯 C 接口）
+## minilua 适配依据与历史运行（Android SO，纯 C 接口）
+
+薄 C 接口仍在原源码项目维护。以下 Java 调用约定记录 2026-11-01 的已运行工程；新建目标通过 [rehost](../../docs/USAGE.md#rehost-从零生成) 从零调查并生成 harness，不再复制样本 Java 模板。旧 workspace 工程和 Run 保留为历史证据。
 
 工程归属原 minilua workspace 的 `harnesses/minilua/`。这是纯 C/native 目标，
 不创建 Dalvik VM，不实现 JNI，不调用 JNI_OnLoad。
@@ -20,7 +22,7 @@
 
 准备构建依赖用统一安装入口 `scripts/install_deps.sh --android`；使用宿主 Clang/LLD
 与官方 NDK r27d 的 Bionic sysroot，不在 ARM64 容器执行 x86_64 NDK 编译器。
-构建命令：`python scripts/build_android.py --output <新的构建目录> --obfuscation small`，
+构建命令：`python3 scripts/build_android.py --output <新的构建目录> --obfuscation small`，
 可选 none 或 large；原 Linux 交付物不修改。每次保留独立 build.json 和源码副本。
 `small` 仅平坦化 luaH_get/luaH_set；large 的配置和效果须以该次实际构建记录为准。
 
@@ -30,3 +32,16 @@ request 包含 input_file（相对请求文件）、chunk_name 和可选 argumen
 观察 lua_status、exit_code、stdout/stderr、vm_entries；Proto 保存到 Run 的 proto.txt，
 包含实际代码、常量及子函数关系。语法错误没有可执行 Proto，不要求 VM 入口命中。
 通过目标的 harness-cases.json 核对完整输出和错误；不能把另一个 SO 的通过证据沿用到当前版本。
+
+### 当前目标入口
+
+先按[Android 构建说明](../../samples/minilua/ANDROID.md)在原源码项目构建独立 SO，再从工具根目录导入原 workspace 并生成 harness：
+
+```bash
+tools/venv/bin/python scripts/rehost.py start <新Android-SO> \
+  --workspace <原minilua-workspace> \
+  --goal '调查薄 C 接口，执行 Lua 输入，采集状态、stdout/stderr 与 Proto' \
+  --input samples/minilua/tests/smoke.lua --material samples/minilua/ANDROID.md
+```
+
+上述命令没有独立预期，只收集运行观察，不能标记 passed。历史工程核对八个固定用例：smoke、tables、closures、errors、allocation、capabilities、syntax_error、runtime_error，closures 显式传固定参数；脚本源文件仍在 samples/minilua/tests。要复现固定预期检查，需提供模型不可修改的用例 JSON，并显式关联独立 checker。small/large 在确认兼容后可显式共享工程，每个 SO 保持独立关联和 Run；新 start 总是创建新工程。通用命令见[功能说明](../../docs/USAGE.md)，历史验证见[交付记录](../../docs/milestones/v0.31/DELIVERY.md)。

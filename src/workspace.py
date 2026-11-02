@@ -7,7 +7,7 @@ import sqlite3
 from pathlib import Path
 
 
-PROJECT_DIR = Path(__file__).resolve().parents[1]
+from lightre.paths import PROJECT_DIR
 RESULT_SCHEMA = "2"
 
 

@@ -1,40 +1,31 @@
-
-
 # LightRE
 
-LightRE 是面向 ARM64 SO 的逆向分析工具，首要目标是恢复 VM 混淆中的真实业务逻辑，重点处理其中的控制流平坦化和 MBA（混合布尔算术）混淆。以 Agent Skill 为入口，结合 Ghidra 和 Codex，目标是交付可编译、可独立运行、可继续维护的等价源码工程。静态调查、unidbg 动态实验、表达式化简与差分验证的联合方案见 [核心分析路线](docs/LLM_DECOMPILER_DESIGN.md#vm控制流平坦化与-mba)；面向真实 VM 的动态与求解能力尚未接入。
+LightRE 面向 ARM64 SO 的逆向分析，产品定位是容器内持续运行的服务：提供一个用户指导聊天窗口，并在后台管理多个 Codex CLI 工作会话，自动推进调查、恢复与验证。长期目标是恢复 VM 混淆中的业务逻辑，交付可编译、可独立执行、可继续维护的源码工程。
 
-当前 V0.2 范围为 Ghidra 直接反编译、一轮 LLM 保守整理与 Web 评论续做。允许保留平坦化、goto、MBA 和 Ghidra 类型，去混淆及 VM 语义恢复留到后续版本；新任务不自动追加深入分析。V0.2 已于 2026-11-01 通过用户人工验收；DG 核心巨函数尚无 C 候选，按用户决定留到后续差分阶段处理。范围与实跑记录见 [V0.2 交付记录](docs/milestones/v0.2/DELIVERY.md)。
+常驻服务、指导聊天与后台编排正在按 [V0.31 计划](docs/milestones/v0.31/PLAN.md#维护与优化计划)整理，尚未接通。当前代码仍使用专用 CLI 和源码浏览 Web；Python 环境由 uv 管理，现有启动方式见 [功能说明](docs/USAGE.md#agent-入口)。项目中的 prompt/workflow 为内部工作指令，[SKILL.md](SKILL.md) 暂作旧调用方式兼容。
 
-已有工作区也可用 `--input-mode assembly` 直接让模型从汇编生成候选，跳过 Ghidra 伪代码及初稿；全部已保存指令和地址一次性内嵌到初始提示词，保留机器码及知识文件快照，可用原 ELF 和 objdump 补核。用法见 [纯汇编输入](docs/milestones/v0.2/USAGE.md#纯汇编输入)。
+当前静态流程使用 Ghidra 导出函数、完整汇编和参考伪代码，再由 Codex 生成一轮保守候选；已有工作区支持直接从完整汇编生成候选。Web 用于查看同一份源码、知识和任务，提交修改建议。候选允许保留 goto、平坦化、MBA 和已注明的 Ghidra 局限，未经动态等价验证。
 
-默认首轮及 Web“继续还原”也会将既无 Ghidra 初稿也无已有候选的函数自动分流到完整汇编输入，保留读取工具并按每批 600 秒执行。汇编与伪代码整理分别合批；超大单函数仍独占一批，不需手动补发纯汇编任务。
+动态执行以 [rehost workflow](docs/USAGE.md#rehost-从零生成) 调查未知 Android ARM64 SO，从空目标工程生成 unidbg harness，并根据真实运行逐项补环境。工具复用构建、Run 快照、重放及失败交接；不复制预制目标 Java harness。没有独立预期时只收集观察，固定用例/检查器存在时进行外部核验。DG/minilua 旧单边运行记录保留为历史证据，不代替新 workflow 的真实集成验证。
 
-长期自动化以 [Goal Loop](docs/GOAL_LOOP.md) 为支柱：一次提交目标，由 Python 循环调用 `codex exec`，根据实际构建、运行与回归结果自动续做，直至通过交付检查。该闭环尚在规划；现有功能提供静态分析、源码候选与可选的 Web 审阅。
+| 范围 | 状态 |
+| --- | --- |
+| V0.2 静态候选与 Web 审阅 | 2026-11-01 已通过用户人工验收 |
+| V0.31 通用 harness 与修复循环 | 开发实现及实跑已有记录，用户继续验收中 |
+| 常驻服务、指导聊天窗口与多工作会话整合 | 已明确为 V0.31 收尾方向，待实施和验证 |
+| 候选 SO 构建、双边差分、VM 语义恢复、完整工程 Goal Loop | 尚未交付 |
 
-正在开发的 [V0.31](docs/milestones/v0.31/PLAN.md) 已接入简单 Android ARM64 测试 SO 的 unidbg harness、结果保存与重放，以及每轮独立 exec、完整保存返回和反馈真实失败的 harness 修复 loop，尚待人工验收。操作见 [V0.31 使用说明](docs/milestones/v0.31/USAGE.md)，实际检查见 [交付记录](docs/milestones/v0.31/DELIVERY.md)。用户随后授权的 DG JNI 与 minilua Android SO 运行适配已加入，命令、真实证据和环境限制见 [目标 harness](docs/TARGET_HARNESSES.md)。通用核心与目标规则已拆分，接入新目标见 [harness 执行契约](docs/HARNESS_CONTRACT.md)。候选构建和双边差分按 [V0.3 总体方案](docs/milestones/v0.3/PLAN.md) 后续加入。
+DG 巨函数 0x1c07c 仍无完整 C 候选，按用户决定留到后续差分阶段处理；原 VM 能运行不表示该恢复问题已经解决。
 
-运行环境为 Ubuntu 24 Linux 容器。系统依赖统一通过 `bash scripts/install_deps.sh` 安装，包含 Ghidra、匹配的 JDK、Maven、Clang、LLD 与格式化工具；仅准备 unidbg 运行环境可用 `--runtime-only`；构建 Android minilua 使用同一入口的 `--android`，安装 LLVM14 与官方 NDK Bionic sysroot。容器内 Codex 默认使用 `danger-full-access`，无需嵌套 namespace。
+目标交互是在 LightRE 指导窗口中提交目标、了解进度、调整任务，由服务器创建后台工作会话并核验实际产物。关闭窗口不会取消已提交工作；当前 CLI/兼容 Agent 入口继续按功能说明使用，不能将现有源码浏览页面当成指导聊天已实现。
 
-让 Codex 读取项目中的 [SKILL.md](SKILL.md)，描述目标目录或二进制文件即可，无需全局安装 Skill：
+分析产物写入所选外部 workspace，每个 SO 独立保存 SQLite、原始副本、源码、知识与运行记录。系统依赖统一通过 scripts/install_deps.sh 准备；不要求为使用工具逐轮确认内部步骤。
 
-```text
-读取 LightRE/SKILL.md，打开 ./dg-samples/dC6BDAE，展示函数和汇编。
-```
+- [当前功能、命令与 API](docs/USAGE.md)
+- [文档入口与职责](docs/README.md)
+- [后续路线](docs/ROADMAP.md)
+- [V0.3 第三阶段计划：unidbg 运行与差分闭环](docs/milestones/v0.3/PLAN.md)
+- [V0.31 验收范围](docs/milestones/v0.31/PLAN.md)与[真实检查记录](docs/milestones/v0.31/DELIVERY.md)
+- [VM 分析方法](docs/design/VM_RECOVERY.md)
 
-Agent 会识别目标、创建或恢复外部分析工作区、导出结果，启动 Web 并返回访问地址。默认工作区位于调用 Skill 时的目录下，相对路径也以该目录为基准；临时切到工具目录不改变分析产物位置。上例假设 LightRE 与 dg-samples 位于调用目录下，其他布局使用实际路径。也可使用仓库内的启动指令调用 Codex CLI：
-
-```bash
-codex exec --sandbox danger-full-access --skip-git-repo-check - < LightRE/tests/dg_start.md
-```
-
-仓库内置 ARM64 minilua 样本，可将 [minilua 启动指令](tests/minilua_start.md)交给 Agent 体验；已有样本可使用 [dg 启动指令](tests/dg_start.md)。
-
-分析流程由 Ghidra Headless 统一导出自身识别的函数、范围、汇编、参考伪代码与分组。LightRE 自动整理模块初稿，再按模块分批调用本地 Codex CLI，默认 8 批并发。单函数反编译失败保留汇编和原因，首轮材料不足则明确未解决，新任务完成一轮后停止，也可用评论继续调查；静态导出整体失败则保留旧结果并报错。首轮直接批量审阅初稿并返回局部修改，避免逐函数深入调查和重复输出大段源码；失败独立有限重试，进度区分候选、未解决与执行失败。Web 读取已保存结果，不重复启动 Ghidra。Rizin 仅作为 Agent 按需使用的可选工具。
-
-Web 支持函数名称/RVA 搜索、汇编分段浏览、源码查看及并列对照、状态筛选和任务进度。用户可针对函数提交修改建议继续分析，无需逐个认可；评论优先入队，任务支持暂停、继续和取消。Web 展示实际保存片段的代码和普通注释，隐藏机器定位注释；提交建议保留原始片段快照与摘要。候选均未经执行验证，unidbg 和差分验证尚未接入。
-
-分析工作区与工具及样本仓库分离，位置可指定。每份 SO 独立保存 SQLite、源码、知识和任务记录；源码位于 `source/src/`，函数知识统一保存在 `knowledge.md`，按 RVA 分节。任务、模型输出和日志持久保存，新会话可继续处理未解决问题。
-
-- [使用说明与本地 API](docs/milestones/v0.2/USAGE.md)
-- [文档入口：职责、阅读顺序与版本范围](docs/README.md)
+日常开发检查使用轻量临时数据，不启动浏览器、完整分析或模型任务。样本启动 Markdown 只用于人工指定目标：[DG](tests/dg_start.md)、[minilua](tests/minilua_start.md)。

@@ -125,6 +125,8 @@ def _run(directory, harness, parameters, root, request, request_base, replay,
         if bool(spec.get('checker')) != ('checker.py' in old['verification_files']):
             raise ValueError('Saved checker declaration differs from its manifest')
         contract = Contract.load(replay).save(root)
+        if contract.observing and digest(replay / 'observation.json') != old.get('observation_sha256'):
+            raise ValueError('Saved observation has changed')
         if contract.spec['parameters'] != old['parameters']:
             raise ValueError('Saved invocation differs from its contract')
         if set(old.get('artifacts', {})) != set(contract.spec['artifacts']):
@@ -197,9 +199,16 @@ def _run(directory, harness, parameters, root, request, request_base, replay,
         report.update(status='cancelled' if execution['status'] == 'cancelled' else 'execution_failed',
                       error=f'Harness execution failed; see {root / "execute"}')
         return
-    observation = read_json(root / 'observation.json')
+    try:
+        observation = read_json(root / 'observation.json')
+    except (OSError, ValueError) as error:
+        report.update(status='observation_failed', error=str(error))
+        return
     differences = compare(observation, wanted)
     differences.extend(contract.validate(observation, root))
+    manifest['observation_sha256'] = digest(root / 'observation.json')
+    if old is not None and contract.observing and not type_equal(observation, read_json(replay / 'observation.json')):
+        differences.append('Observed results differ from saved Run')
     artifacts = {}
     for name in contract.spec['artifacts']:
         path = artifact_path(root, name)
@@ -221,8 +230,10 @@ def _run(directory, harness, parameters, root, request, request_base, replay,
             or (current_baseline is not None and baseline_files(directory) != current_baseline)
             or any(digest(item['path']) != item['sha256'] for item in dependencies)):
         differences.append('Request, input or runtime dependencies changed during execution')
+    observed = contract.observing and not differences
     report.update(observation=observation, differences=differences,
-                  status='passed' if not differences else 'mismatch', passed=not differences)
+                  status='mismatch' if differences else ('observed' if observed else 'passed'),
+                  passed=not differences and not contract.observing, observed=observed)
 
 
 def check(directory, *, timeout=120, cancelled=lambda: False):
@@ -250,7 +261,8 @@ def check(directory, *, timeout=120, cancelled=lambda: False):
                 write_json(root / 'verification.json', report)
             else:
                 report['passed'] = all(item['passed'] for item in report['runs'])
-                report['status'] = 'passed' if report['passed'] else 'failed'
+                report['observed'] = all(item.get('observed') for item in report['runs'])
+                report['status'] = 'passed' if report['passed'] else ('observed' if report['observed'] else 'failed')
             if baseline_files(directory) != baseline:
                 raise RuntimeError('Target configuration or cases changed during verification')
             if source_files(harness) != before:

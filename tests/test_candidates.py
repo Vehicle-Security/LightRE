@@ -10,8 +10,6 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-
 from recovery import merge_sources, read_candidate, save_candidate, read_knowledge
 from recovery.candidates import GHIDRA_MARKER, candidate_rvas, migrate_candidates
 from recovery.jobs import BusyError, _batches, progress, run_task, start_task, task_state

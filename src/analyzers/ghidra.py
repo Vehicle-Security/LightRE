@@ -12,7 +12,8 @@ import time
 from pathlib import Path
 from uuid import uuid4
 
-from workspace import PROJECT_DIR, RESULT_SCHEMA, WorkspaceReader, prepare_workspace
+from workspace import RESULT_SCHEMA, WorkspaceReader, prepare_workspace
+from lightre.paths import TOOLS_DIR
 
 SCRIPT = Path(__file__).with_name('ghidra_scripts') / 'ExportReferences.java'
 ANALYSIS_PROFILE = 'ghidra-catalog-v1'
@@ -25,7 +26,7 @@ def _write(path, value):
 
 
 def find_headless():
-    home = Path(os.environ.get('GHIDRA_HOME', PROJECT_DIR / 'tools/ghidra'))
+    home = Path(os.environ.get('GHIDRA_HOME', TOOLS_DIR / 'ghidra'))
     local = home / 'support/analyzeHeadless'
     return str(local) if local.is_file() else shutil.which('analyzeHeadless')
 

@@ -5,7 +5,7 @@ import shutil
 import subprocess
 from xml.etree import ElementTree
 
-from workspace import PROJECT_DIR
+from lightre.paths import CLANG_FORMAT
 from .candidates import (
     _atomic_write, _blocks, _identity, _index, _migration_locked, _read_text, _strip_producer,
 )
@@ -42,7 +42,7 @@ def format_code(reader, code):
     style = reader.directory / 'source/.clang-format'
     if not style.exists():
         style.parent.mkdir(parents=True, exist_ok=True)
-        _atomic_write(style, _read_text(PROJECT_DIR / '.clang-format'))
+        _atomic_write(style, _read_text(CLANG_FORMAT))
     try:
         prepared = _close_signature_gaps(code).lstrip('\r\n').rstrip('\r\n') + '\n'
         result = subprocess.run(

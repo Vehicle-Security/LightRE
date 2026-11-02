@@ -3,8 +3,10 @@
 import json
 import re
 import shutil
+import shlex
+import sys
 
-from workspace import PROJECT_DIR
+from lightre.paths import SOURCE_DIR
 from .knowledge import read_knowledge
 
 
@@ -60,7 +62,7 @@ def assembly_prompt(reader, state, prefix, batch):
 任务目标：{prefix.parent / 'task.md'}。SO SHA256：{sample.get('sha256')}。
 原始 ELF：{reader.directory / 'binary/original.so'}。
 保存的 image_base：{image_base:#x}（用于解释仍保留原地址体系的非分支操作数）。
-工具 Python 目录：{PROJECT_DIR / 'src'}。
+工具 Python 目录：{SOURCE_DIR}。
 objdump：{shutil.which('aarch64-linux-gnu-objdump')}；readelf：{shutil.which('aarch64-linux-gnu-readelf')}。
 本批材料清单：{json.dumps(inputs, ensure_ascii=False)}
 用户意见：{json.dumps(state.get('comment') or '从本提示词中的全部汇编直接生成初步 C 候选。', ensure_ascii=False)}
@@ -72,7 +74,7 @@ objdump：{shutil.which('aarch64-linux-gnu-objdump')}；readelf：{shutil.which(
 遇到具体字节、边界或调用约定疑点时才按需使用只读工具补核，不把已有全部正文重新分段读取一遍。
 保存的目录边界不是完整性的证明，ranges 之外可能遗漏实际指令。知识中的边界线索须以原 ELF 核对；
 可用 objdump 直接反汇编原 ELF 补查遗漏块，使用 readelf 确定 ELF 地址换算，不能照搬保存的 image_base。
-也可把工具目录加入 sys.path，from workspace import WorkspaceReader，
+使用本工具的 Python {shlex.quote(sys.executable)}，直接 from workspace import WorkspaceReader，
 reader=WorkspaceReader({str(reader.directory)!r})，reader.assembly(rva, offset=..., limit=200) 分页读取其他函数的汇编。
 代码逻辑以机器指令为依据；旧知识只是未验证线索，不以已有 C 候选代替汇编分析。
 

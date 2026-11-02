@@ -6,8 +6,6 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
-
 from recovery import knowledge_rvas, migrate_knowledge, read_knowledge, save_knowledge, save_knowledge_batch
 from recovery import knowledge
 

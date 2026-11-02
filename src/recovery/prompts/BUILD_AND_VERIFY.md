@@ -4,7 +4,7 @@
 
 你负责把当前任务范围内的恢复源码构建为 Android ARM64 候选 SO，并完成任务要求的运行及差分检查。直接调查、修改、执行和修复，不停在构建建议或第一条错误上。一次 `codex exec` 可以反复修改、编译和检查；外层 LightRE 执行器负责本轮结束后的独立核验、续跑与任务状态，不在本轮启动另一层 Codex 循环。
 
-这是 LightRE recovery 功能内部的 workflow，尚未接入执行器。它与 [源码恢复指令](RECOVER_AND_REFINE.md) 配合使用；来源调查、VM 语义、类型及命名遵循该指令，构建产物和比较依据遵循 [动态差分设计](../../../docs/DIFFERENTIAL_EXECUTION.md)。这些文档不代表工具链或运行器已经可用。
+这是 LightRE recovery 功能内部的 workflow，尚未接入执行器。它与 [源码恢复指令](RECOVER_AND_REFINE.md) 配合使用；来源调查、VM 语义、类型及命名遵循该指令，构建产物和比较依据遵循 [动态差分设计](../../../docs/design/DIFFERENTIAL_EXECUTION.md)。这些文档不代表工具链或运行器已经可用。
 
 ## 读取任务与当前状态
 

@@ -13,7 +13,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
-from workspace import PROJECT_DIR
 from .candidates import candidate_rvas, read_candidate
 
 ACTIVE = ("queued", "running")
@@ -113,7 +112,7 @@ def _ensure_worker(reader):
         with (root / 'worker.log').open('ab') as log:
             subprocess.Popen(
                 [sys.executable, '-m', 'recovery._worker', str(reader.directory), str(lock.fileno())],
-                cwd=reader.directory, env={**os.environ, 'PYTHONPATH': str(PROJECT_DIR / 'src')},
+                cwd=reader.directory,
                 pass_fds=(lock.fileno(),), stdin=subprocess.DEVNULL,
                 stdout=log, stderr=subprocess.STDOUT, start_new_session=True,
             )

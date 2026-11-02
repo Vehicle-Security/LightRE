@@ -4,11 +4,11 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from workspace import PROJECT_DIR
+from lightre.paths import TOOLS_DIR
 
 
 def find_rizin() -> str:
-    local = PROJECT_DIR / "tools/rizin/bin/rizin"
+    local = TOOLS_DIR / "rizin/bin/rizin"
     found = str(local) if local.is_file() else shutil.which("rizin")
     if not found:
         raise RuntimeError("找不到 Rizin，请先运行 scripts/install_deps.sh --with-rizin")

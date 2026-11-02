@@ -1,8 +1,10 @@
 """Per-harness instructions, preserved across repairs and saved with each Run."""
 
 from pathlib import Path
+import shlex
 
 from workspace import PROJECT_DIR
+from lightre.paths import REPOSITORY_DIR, python_command
 
 
 TEMPLATE = Path(__file__).parent / 'prompts/HARNESS.md'
@@ -22,7 +24,10 @@ def ensure(harness, target='target', *, instructions=None):
     if not path.exists():
         body = TEMPLATE.read_text(encoding='utf-8').replace('{{TARGET}}', target)
         body = body.replace('{{ADAPTATION}}', Path(instructions).read_text(encoding='utf-8') if instructions else '请调查并补充本目标的 ABI、初始化、输入输出与已知缺口。')
-        body = body.replace('{{LIGHTRE}}', str(PROJECT_DIR))
+        native = (shlex.join(['bash', str(REPOSITORY_DIR / 'scripts/install_deps.sh'), '--runtime-only']) if REPOSITORY_DIR
+                  else '在 LightRE 源码目录执行 bash scripts/install_deps.sh --runtime-only；Python 安装包不包含系统工具')
+        body = body.replace('{{SYSTEM_DEPENDENCIES}}', native)
+        body = body.replace('{{HARNESS_COMMAND}}', python_command('lightre.cli.harness'))
         with path.open('x', encoding='utf-8') as stream:
             stream.write(body)
     return path

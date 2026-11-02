@@ -1,8 +1,10 @@
-## 目标适配：DG（JNI，显式 headless-v1 fixture）
+## DG 历史适配记录（JNI，headless-v1 fixture）
+
+以下记录 2026-11-01 已运行工程的 ABI、环境与限制，供调查和核对证据。当前新建目标通过 [rehost](../../docs/USAGE.md#rehost-从零生成) 从零生成 harness，不再通过样本模板或便捷配置脚本生成 Java。旧工程和 Run 保留在原 workspace；这些记录不能代替新流程的集成验证。
 
 工程归属原 DG workspace 的 `harnesses/dg/`。DG 需要 JNI：使用 Android ARM64、
 API23 / Unicorn2 / unidbg 0.9.9，建立 Dalvik VM，实际执行 JNI_OnLoad 并保存 RegisterNatives。
-当前模板调用类 com/google/ccc/abuse/droidguard/DroidGuard 的实例方法，不能当作静态方法调用。
+当时的工程调用类 com/google/ccc/abuse/droidguard/DroidGuard 的实例方法，不能当作静态方法调用。
 每个新 SO 版本仍需核对实际注册、签名和初始化；共享工程不代表跨版本行为相同。
 
 实际生命周期：JNI_OnLoad → new DroidGuard instance →
@@ -32,3 +34,15 @@ addLocalObject(exception)，否则 ExceptionOccurred 返回未注册引用，后
 外部检查要求真实核心命中、有效 handle、非空 byte[]、close 完成、七条注册、无缺失 JNI 或模拟错误；
 重放使用保存的源码/参数/输入/依赖，并校验输出字节文件哈希。通过仅适用于所选输入和上述 fixture。
 Java 入口 `lightre.DgHarness SO request.json observation.json`，参数路径相对 request。
+
+### 当前目标入口
+
+从 LightRE 根目录复用原 SO 分析目录，传入匹配版本的输入和只读资料：
+
+```bash
+tools/venv/bin/python scripts/rehost.py start <原DG的SO分析目录> \
+  --goal '调查 JNI 注册与初始化，实际运行输入并记录输出、环境假设与缺口' \
+  --input <匹配版本的bin文件> --material <匹配版本的资料目录>
+```
+
+未知 SO 版本须先调查真实入口，不能套用本版 RVA。每次 start 在原 workspace 的 harnesses 下创建独立工程；续做同一任务使用 resume。上述命令没有独立预期，只能取得 observed、passed=false。已有固定用例时按[功能说明](../../docs/USAGE.md#harness-配置与运行)配置独立检查器；历史验证路径只在[交付记录](../../docs/milestones/v0.31/DELIVERY.md)维护。

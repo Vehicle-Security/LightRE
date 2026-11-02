@@ -22,13 +22,13 @@ Run 保存执行前的 HARNESS.md、源码和 pom 副本，历史副本只用于
 
 ## 工具与记录
 
-系统依赖唯一入口：`bash {{LIGHTRE}}/scripts/install_deps.sh --runtime-only`。
+系统依赖：{{SYSTEM_DEPENDENCIES}}。
 运行与重放命令（先用 configure 关联工程、用例、检查器与产物）：
 
 ```bash
-{{LIGHTRE}}/tools/venv/bin/python {{LIGHTRE}}/scripts/harness.py run <SO目录>
-{{LIGHTRE}}/tools/venv/bin/python {{LIGHTRE}}/scripts/harness.py check <SO目录>
-{{LIGHTRE}}/tools/venv/bin/python {{LIGHTRE}}/scripts/harness.py replay <SO目录> <旧Run目录>
+{{HARNESS_COMMAND}} run <SO目录>
+{{HARNESS_COMMAND}} check <SO目录>
+{{HARNESS_COMMAND}} replay <SO目录> <旧Run目录>
 ```
 
 任务的 contract.json、固定 SO、预期、检查器和历史记录只读。

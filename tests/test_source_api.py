@@ -12,8 +12,6 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
-
 from recovery import save_candidate, save_knowledge
 from recovery.jobs import run_task
 from recovery.queue import run_queue, submit, write_state

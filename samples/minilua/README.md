@@ -12,7 +12,7 @@
 
 重建：`bash scripts/build.sh --large`。参考和证据在 [大函数报告](large/reports/verification.md)、[大函数 manifest](large/manifest.json)。原来的小函数版 `deliverable/minilua` 保留，便于先定位基础问题；其目标为 `luaH_get @ 0x85a0`、`luaH_set @ 0x8ea8`。
 
-详细入口、对照文件和复测命令见 [使用说明](USAGE.md)。以下保留第一阶段的小样本构建需求；大函数版是其中允许的独立“基本块拆分 + 平坦化”实验，混淆目标为 `luaV_execute`。
+详细入口、对照文件和复测命令见 [使用说明](BUILD.md)。以下保留第一阶段的小样本构建需求；大函数版是其中允许的独立“基本块拆分 + 平坦化”实验，混淆目标为 `luaV_execute`。
 
 ## 一、项目目标
 
@@ -185,7 +185,7 @@ project/
     └── smoke.lua
 ```
 
-`deliverable/` 中只放混淆后的目标文件和一个小型演示脚本。运行说明见外层 `USAGE.md`，版权与许可声明见 `src/LICENSE.lua`。
+`deliverable/` 中只放混淆后的目标文件和一个小型演示脚本。运行说明见外层 `BUILD.md`，版权与许可声明见 `src/LICENSE.lua`。
 
 禁止在该目录内通过软链接引用外部文件来规避大小限制。
 

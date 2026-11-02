@@ -11,8 +11,6 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
-
 from recovery import format_sources, read_candidate, read_knowledge, save_candidate
 from recovery.candidates import GHIDRA_MARKER, _identity, _blocks, _read_text
 from recovery.formatting import FormattingError, format_code
