@@ -2,15 +2,13 @@
 
 Codex CLI 读取的 Prompt、Skill 和 Workflow 指令正文全部由使用它的业务模块维护。各模块的 `prompts/` 保存模板，`skills/`、`workflows/` 保存需要相互引用的操作文档和配套资源，发布后保留原目录结构。
 
-Skill 的使用范围是 LightRE 自己启动的 Codex CLI：由所属模块随包提供，执行时在任务 Prompt 中注入名称、适用描述和文档路径，供 Codex 按需读取。Recovery 已接入内部目录注入，为每批保存文档快照和 SHA256 清单；无需面向外部提供安装入口或全局注册。INITIAL 保持无工具快速路径，不注入 Skill。
+Skill 的使用范围是 LightRE 自己启动的 Codex CLI：由所属模块随包提供，执行时在任务 Prompt 中注入名称、适用描述和文档路径，供 Codex 按需读取。Recovery 使用一个内部 Skill，为每批保存文档快照和 SHA256 清单；无需面向外部提供安装入口或全局注册。两个任务模板均注入该 Skill，按需只读取证。
 
 | 模块 | 资源 | 职责 |
 | --- | --- | --- |
 | `lightre` | `prompts/EXPLORE.md` | 选择目标 SO |
-| `recovery` | `prompts/INITIAL.md`、`FEEDBACK.md`、`TARGETED.md`、`ASSEMBLY.md` | 首轮整理、用户建议、定向分析、汇编恢复 |
-| `recovery` | `prompts/TASK.md`、`FOLLOWUP.md`、`ASSEMBLY_FEEDBACK.md` | 持久任务说明及特定模式的补充要求 |
-| `recovery` | `prompts/ASSEMBLY_HEADER.md`、`ASSEMBLY_SECTION.md`、`SOURCE_README.md`、`KNOWLEDGE_HEADER.md` | 汇编输入、源码说明和知识文档模板 |
-| `recovery` | `prompts/SKILLS.md`、`skills/*/SKILL.md` 及其 `references/` | 注入内部方法目录，按需加载汇编恢复、候选核对和评论处理方法 |
+| `recovery` | `prompts/RECOVER.md`、`FEEDBACK.md` | 首轮/指定函数代码改进，以及根据用户意见修改；汇编作为输入条件分支 |
+| `recovery` | `skills/lightre-recovery/SKILL.md`、`references/ASSEMBLY.md` | 一个内部方法入口及一份机器取证参考 |
 | `rehost` | `prompts/`、`workflows/unidbg/` | Harness 说明、修复要求、轮次上下文及 unidbg 操作依据 |
 | `analyzers` | `prompts/BOUNDARY_CHANGES.md` | 给已有知识补充边界变更和旧资料读取说明 |
 
@@ -30,4 +28,6 @@ Python 准备任务、路径、JSON、状态和输出 schema；操作要求、�
 
 Setuptools 在构建时递归收集所有模块下的 Markdown，并按原相对路径复制到发布包。源码包通过 `MANIFEST.in` 包含这些文件，wheel 通过通用 `package-data` 规则包含它们；新增模块或更深层的 Markdown 不需要逐文件登记。工程所需的 Java、XML、网页等资源继续按各自类型配置。
 
-发布检查逐文件比较源码、wheel 和源码包中的 Markdown 内容，并检查 wheel 是否残留已经删除的模板。构建与检查命令见 [使用指南](../USAGE.md#prompt-资源发布)。
+模板和 Skill 从模块安装位置定位，不依赖当前工作目录或源码仓库；Skill 复制到任务快照后保留 references 的相对目录，任务 Prompt 注入快照入口的绝对路径。
+
+发布检查逐文件比较源码、wheel 和源码包中的 Markdown 内容，并检查 wheel 是否残留已经删除的模板。另在全新虚拟环境实际安装 wheel，使用隔离 Python 从源码目录之外运行资源、模板和 Recovery 批次测试，确认模块及文档来自该安装位置。构建与检查命令见 [使用指南](../USAGE.md#prompt-资源发布)。

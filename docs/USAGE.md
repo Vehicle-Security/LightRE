@@ -63,11 +63,15 @@ workspace 根目录的 `target.json` 保存输入目录相对位置、主 SO、�
 | GET | `/api/recovery` | Recovery 队列和函数状态 |
 | POST | `/api/recovery/resume` | 恢复或提交 Recovery 任务 |
 
-函数浏览器由 `webui` 模块提供，服务挂载在 `/ui/`；浏览器内部接口包括 `/api/functions`、`/api/functions/{rva}/assembly`、`/api/functions/{rva}/candidate`、评论和任务控制接口。页面只读取保存结果，提交评论后由 Recovery 队列异步处理。
+函数浏览器由 `webui` 模块提供，服务挂载在 `/ui/`；浏览器内部接口包括 `/api/functions`、`/api/functions/{rva}/assembly`、`/api/functions/{rva}/candidate`、评论和任务控制接口。`POST /api/functions/{rva}/recover` 重新分析指定函数，包括已经有 LLM 候选的函数。页面读取保存结果，重新分析和评论由 Recovery 队列异步处理。
 
 ## Recovery
 
 Recovery 处理函数候选和 Knowledge：
+
+页面“任务详情”按模块展示：Recovery 区域提供“暂停队列”“恢复队列”和“分析剩余 N 个函数”，控制函数分析与修改建议任务；Rehost 区域单独展示运行验证状态及错误。
+
+升级 Prompt 不会自动改写已有分析结果，“分析剩余 N 个函数”跳过已有 LLM 候选的函数。要用当前规则改善旧结果，重启服务加载更新后，选中函数并点击“重新分析”；它保留当前代码和 Knowledge 作为输入，使用 `RECOVER.md` 创建定向任务，完成后刷新函数名称和源码。原始 catalog 名称和 RVA 不变，界面显示当前 C 名称。
 
 ```python
 from lightre.workspace import WorkspaceReader
@@ -151,11 +155,15 @@ sh tests/test_clean_container.sh
 
 ## Recovery 内部 Skill
 
-Recovery 的汇编恢复、定向核对和评论任务会自动注入可用方法的名称、适用描述与文档路径，Codex CLI 自行选择并读取；无需安装 Skill 或修改全局配置。INITIAL 的无工具整理批次不注入方法目录。
+Recovery 运行时仅维护 4 份指令文档：`RECOVER.md` 处理首轮/指定函数重跑，`FEEDBACK.md` 处理用户意见；两者注入同一个 `lightre-recovery/SKILL.md`，机器取证细节集中在其 `references/ASSEMBLY.md`。Codex CLI 读取所需方法，无需安装 Skill 或修改全局配置。首轮主动改善命名、类型、表达式与控制流，证据不足时保留低层结构并说明原因。
 
-每批完整输入保存在 SO 分析目录的 `tasks/<id>/batch-NNNN.prompt.md`。方法正文及引用资料保存在同批 `.skills/` 目录，`.skills.json` 记录入口、描述和逐文件 SHA256；实际读取情况可结合 `.events.jsonl` 查看。全部映射见 [Recovery Prompt 与 Skill](design/RECOVERY_PROMPTS.md)。
+每批完整输入保存在 SO 分析目录的 `tasks/<id>/batch-NNNN.prompt.md`。方法正文及引用资料保存在同批 `.skills/` 目录，`.skills.json` 记录入口、描述和逐文件 SHA256；实际读取情况可结合 `.events.jsonl` 查看。目标和评论只记录于 `state.json`，不再另生成 `task.md`；完整调用映射见 [Recovery Prompt 与 Skill](design/RECOVERY_PROMPTS.md)。
 
-常规验证不调用模型；可显式运行真实 CLI 测试，它会调用已配置并登录的 Codex，在临时 workspace 中验证汇编恢复、定向核对和评论处理：
+源码位于 `source/src/*.c`，每个模块最多 20 个函数，按 Ghidra 分组组织；分组不代表原始源码模块。保留 `@lightre.begin/end` 中的 ID 和 origins，Web 隐藏这些机器定位及生产者注释。模块可以编辑或移动，`source_index` 是自动重建的派生索引。共享类型、接口与构建方式仍需验证，不再另生成 `source/README.md`。
+
+每批 `.changes.json` 记录实际源码差异和改动状态，任务进度区分代码改进与保留；空白和注释变动不计作代码改进。函数列表显示当前源码名称，原始名称仍可搜索。函数改名后自动同步能唯一绑定的直接调用；函数指针、宏、头文件原型和无法解析的引用仍需核对，结果保存在任务目录 `renames.json`。
+
+常规验证不调用模型；可显式运行真实 CLI 测试，它会调用已配置并登录的 Codex，在临时 workspace 中验证首轮命名/表达式改进（编译并检查边界输入）、汇编恢复、定向核对和评论处理：
 
 ```bash
 uv run --locked python -B -m unittest discover -s tests -p test_recovery_skills.py
@@ -173,4 +181,4 @@ uv build --out-dir dist/prompt-release
 LIGHTRE_TEST_DIST=dist/prompt-release uv run --locked python -B -m unittest discover -s tests -p test_packaging.py
 ```
 
-发布目录中应只保留当前版本的一套产物。检查会同时发现遗漏的 Markdown 和 wheel 中残留的旧模板。完整管理约定见 [Prompt 与 Markdown 资源](design/PROMPTS.md)。
+发布目录中应只保留当前版本的一套产物。检查会同时发现遗漏的 Markdown 和 wheel 中残留的旧模板，并用 uv 将 wheel 安装到带中文、空格和引号的全新虚拟环境，在源码目录之外以隔离 Python 验证所有已安装 Markdown 可读、两个 Recovery Prompt 能渲染，以及 Skill 快照的绝对路径和相对引用有效；不调用模型或分析器。完整管理约定见 [Prompt 与 Markdown 资源](design/PROMPTS.md)。

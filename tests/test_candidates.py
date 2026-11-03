@@ -79,8 +79,8 @@ class CandidateTests(unittest.TestCase):
                 self.assertEqual(followup['parent_task'], initial['id'])
                 self.assertEqual(followup['mode'], 'targeted')
                 self.assertFalse(followup['auto_refine'])
-                self.assertIn('自动续做', (Path(followup['directory']) / 'task.md').read_text())
                 run_task(self.reader, followup['id'])
+                self.assertIn('自动续做', (Path(followup['directory']) / 'batch-0000.prompt.md').read_text())
         self.assertEqual(len(snapshot(self.reader)), 2)
         self.assertEqual([job['status'] for job in snapshot(self.reader)], ['partial', 'partial'])
 
@@ -127,9 +127,9 @@ class CandidateTests(unittest.TestCase):
         self.assertIn('入口参数位于 x0', prompt)
         command = commands[0]
         self.assertNotIn('shell_tool', command)
-        self.assertNotIn('model_reasoning_effort="low"', command)
+        self.assertNotIn('model_reasoning_effort="medium"', command)
         schema = json.loads((directory / 'batch-0000.schema.json').read_text())
-        self.assertNotIn('edits', schema['properties']['results']['items']['properties'])
+        self.assertIn('edits', schema['properties']['results']['items']['properties'])
         state = json.loads((directory / 'state.json').read_text())
         self.assertEqual(state['status'], 'complete')
         self.assertEqual(state['ghidra']['status'], 'skipped')
@@ -180,7 +180,7 @@ class CandidateTests(unittest.TestCase):
             def poll(process):
                 process.polls += 1
                 if process.rvas != ['0x8'] and process.polls == 1:
-                    clock[0] += 200  # Assembly batches must survive the fast-pass 180s deadline.
+                    clock[0] += 200  # Both recovery modes allow evidence checks beyond 180s.
                     return None
                 process.output.write_text(json.dumps({'results': [
                     {'rva': rva, 'code': None, 'edits': [], 'notes': '保留初稿，未经执行验证。'}
@@ -210,11 +210,11 @@ class CandidateTests(unittest.TestCase):
             rva = record['rvas'][0]
             assembly_only = rva != 8
             self.assertEqual(record['input_mode'], 'assembly' if assembly_only else 'reference')
-            self.assertEqual(record['timeout'], 600 if assembly_only else 180)
+            self.assertEqual(record['timeout'], 600)
             command, props = commands[rva]
-            self.assertEqual('edits' not in props, assembly_only)
-            self.assertEqual('shell_tool' not in command, assembly_only)
-            self.assertEqual('model_reasoning_effort="low"' not in command, assembly_only)
+            self.assertIn('edits', props)
+            self.assertNotIn('shell_tool', command)
+            self.assertEqual('model_reasoning_effort="medium"' not in command, assembly_only)
             if assembly_only:
                 path = next(directory.glob(f'batch-*-{rva:#010x}.asm'))
                 lines = [line for line in path.read_text().splitlines() if not line.startswith('#')]
@@ -493,7 +493,6 @@ class CandidateTests(unittest.TestCase):
         root.mkdir()
         directory = root / "test"
         directory.mkdir()
-        (directory / "task.md").write_text("还原函数")
         state = {"status": "queued", "directory": str(directory), "rvas": [4],
                  "codex": "fake-codex", "processed": 0, "generated": 0, "unresolved": {}}
         state_path = root / "state.json"
@@ -519,7 +518,6 @@ class CandidateTests(unittest.TestCase):
         root.mkdir()
         directory = root / "parallel"
         directory.mkdir()
-        (directory / "task.md").write_text("并行还原")
         state_path = root / "state.json"
         state_path.write_text(json.dumps({"id": "parallel", "created_at": 0, "status": "queued", "directory": str(directory),
             "rvas": rvas, "codex": "fake-codex", "workers": 3,
@@ -897,9 +895,9 @@ class CandidateTests(unittest.TestCase):
                 process.output = Path(command[command.index('-o') + 1])
                 schema = json.loads(Path(command[command.index('--output-schema') + 1]).read_text())
                 props = schema['properties']['results']['items']['properties']
-                self.assertIn('model_reasoning_effort="low"', command)
+                self.assertIn('model_reasoning_effort="medium"', command)
                 self.assertEqual([command[i + 1] for i, arg in enumerate(command) if arg == '--disable'],
-                                 ['shell_tool', 'plugins', 'apps', 'multi_agent'])
+                                 ['plugins', 'apps', 'multi_agent'])
                 self.assertNotIn('module', props)
                 process.rvas = props['rva']['enum']
                 process.stdin = io.BytesIO()
@@ -985,7 +983,8 @@ class CandidateTests(unittest.TestCase):
         self.assertEqual([job['id'] for job in snapshot(self.reader)], [first['id'], second['id']])
         directory = Path(first['directory'])
         self.assertEqual((directory / 'reviewed.c').read_text(), original['code'])
-        self.assertIn('核对副作用', (directory / 'task.md').read_text())
+        self.assertEqual(json.loads((directory / 'state.json').read_text())['comment'], '核对副作用')
+        self.assertFalse((directory / 'task.md').exists())
         save_candidate(self.reader, 4, 'int latest(void) { return 2; }')
         self.assertEqual((directory / 'reviewed.c').read_text(), original['code'])
         with patch('recovery.queue._ensure_worker'):

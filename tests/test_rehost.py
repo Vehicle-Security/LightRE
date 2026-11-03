@@ -148,7 +148,7 @@ print('{"type":"turn.completed"}')
         self.assertEqual(len(list((self.directory / 'tasks').glob('harness-*'))), 1)
 
     def test_restart_after_association_publication_reuses_bootstrap_project(self):
-        with patch('rehost.workflow.repair', side_effect=RuntimeError('process exited before task creation')):
+        with patch('rehost.workflow.run_rounds', side_effect=RuntimeError('process exited before task creation')):
             with self.assertRaisesRegex(RuntimeError, 'process exited'):
                 self.start()
         config = read_json(self.directory / 'harness.json')

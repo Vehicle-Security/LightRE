@@ -12,7 +12,6 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 from lightre.workspace import WorkspaceReader
-from lightre.prompt import render_prompt
 from .markers import begin, end, parse, comments
 
 
@@ -296,10 +295,6 @@ def save_candidate(reader: WorkspaceReader, rva: int, code: str, module="recover
             text = _module_header(meta) + text[len(prefix):]
             text += canonical + '\n' + end(source_id) + '\n\n'
         _atomic_write(path, text)
-        readme = reader.directory / "source/README.md"
-        if not readme.exists():
-            readme.write_text(render_prompt(Path(__file__).parent / 'prompts/SOURCE_README.md',
-                                            FUNCTIONS_PER_FILE=FUNCTIONS_PER_FILE), encoding='utf-8')
         _index(reader, meta, names)
         return path
 

@@ -12,8 +12,9 @@
 | [源码导航](SOURCE_NAVIGATION.md) | 当前身份标记与一对一导航协议，以及未来多对多发布设计 |
 | [任务队列](TASK_QUEUE.md) | 已实现的静态候选与评论调度、锁、持久化及恢复协议 |
 | [Prompt 资源](PROMPTS.md) | 各模块的指令归属、Jinja2 模板与递归打包规则 |
-| [Recovery Prompt 映射](RECOVERY_PROMPTS.md) | 全部 12 份模板与 3 个内部 Skill 的调用条件、按需加载和批次快照 |
+| [Recovery Prompt 映射](RECOVERY_PROMPTS.md) | 两个任务 Prompt、一个内部 Skill 与一份汇编参考的调用和留档 |
 | [Rehost 知识库](REHOST_KNOWLEDGE.md) | HARNESS.md / workspace 知识库 / 轮次快照三层经验的职责与注入方式 |
+| [Rehost 模块设计](REHOST_DESIGN.md) | 入口、分层、各文件职责、数据目录与关键约束 |
 
 ## 未来功能
 

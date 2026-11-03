@@ -7,21 +7,10 @@ import time
 from pathlib import Path
 
 from lightre.workspace import PROJECT_DIR
-from .guide import ensure, record
-from .process import execute, succeeded
-from .storage import digest, exclusive, identifier, inventory, read_json, write_json
+from .knowledge import ensure_guide, record_check
+from .storage import execute, succeeded
+from .storage import association, digest, exclusive, identifier, inventory, read_json, write_json
 from .contract import Contract, artifact_path, baseline_files, case_path, case_request, cases, type_equal
-
-
-def association(directory):
-    directory = Path(directory).resolve()
-    if directory.is_relative_to(PROJECT_DIR):
-        raise ValueError('Run outputs must be outside the LightRE repository')
-    config = read_json(directory / 'harness.json')
-    harness = (directory / config['path']).resolve()
-    if harness.is_relative_to(PROJECT_DIR):
-        raise ValueError('Use an editable harness outside the LightRE repository')
-    return harness, config.get('parameters', {})
 
 
 def source_files(harness):
@@ -51,7 +40,8 @@ def compare(observation, wanted):
     return differences
 
 
-def _target(directory):
+def target_info(directory):
+    """分析目录的固定 SO：校验工作区身份与 ARM64 ELF 头，返回路径和 SHA256。"""
     binary = directory / 'binary/original.so'
     with sqlite3.connect((directory / 'index.sqlite').as_uri() + '?mode=ro', uri=True) as conn:
         row = conn.execute("SELECT value FROM metadata WHERE key='sha256'").fetchone()
@@ -81,7 +71,7 @@ def run(directory, request=None, *, request_base=None, replay=None, timeout=120,
                 _run(directory, harness, parameters, root, request, request_base, replay,
                      timeout, cancelled, fds, report)
                 if replay is None and _update_guide:
-                    record(harness, report, root / 'verification.json')
+                    record_check(harness, report, root / 'verification.json')
         else:
             _run(directory, harness, parameters, root, request, request_base, replay,
                  timeout, cancelled, _lock_fds, report)
@@ -98,7 +88,7 @@ def run(directory, request=None, *, request_base=None, replay=None, timeout=120,
 
 def _run(directory, harness, parameters, root, request, request_base, replay,
          timeout, cancelled, fds, report):
-    binary = _target(directory)
+    binary = target_info(directory)
     source = root / 'harness'
     manifest = {'binary': binary, 'parameters': parameters, 'replay_of': None, 'contract_version': 1}
     old = None
@@ -141,7 +131,7 @@ def _run(directory, harness, parameters, root, request, request_base, replay,
             raise ValueError('Saved expected results differ from checker contract')
         manifest.update(replay_of=str(replay), input_origin=old.get('input_origin'))
     else:
-        ensure(harness, directory.name)
+        ensure_guide(harness, directory.name)
         current_baseline = baseline_files(directory)
         contract = Contract.current(directory).save(root)
         if request is None:
@@ -246,7 +236,7 @@ def check(directory, *, timeout=120, cancelled=lambda: False):
               'runs': [], 'started_at': time.time()}
     try:
         with exclusive(directory, harness) as fds:
-            ensure(harness, directory.name)
+            ensure_guide(harness, directory.name)
             before = source_files(harness)
             baseline = baseline_files(directory)
             report['baseline'] = baseline
@@ -267,7 +257,7 @@ def check(directory, *, timeout=120, cancelled=lambda: False):
                 raise RuntimeError('Target configuration or cases changed during verification')
             if source_files(harness) != before:
                 raise RuntimeError('Editable harness changed during target verification')
-            record(harness, report, root / 'verification.json')
+            record_check(harness, report, root / 'verification.json')
             report['harness_files'] = source_files(harness)
     except (OSError, RuntimeError, ValueError, KeyError) as error:
         report.update(status='error', passed=False, error=str(error))

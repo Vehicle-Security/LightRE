@@ -222,8 +222,8 @@ def configure(target, *, harness, cases_file, main_class, checker=None, artifact
               instructions=None, verification='expected'):
     """Associate any Maven harness with an explicit verification contract."""
     from lightre.workspace import PROJECT_DIR, prepare_workspace
-    from .guide import ensure
-    from .runner import _target
+    from .knowledge import ensure_guide
+    from .runner import target_info
     from .storage import exclusive
     target, harness = Path(target).resolve(), Path(harness).resolve()
     if target.is_file():
@@ -232,7 +232,7 @@ def configure(target, *, harness, cases_file, main_class, checker=None, artifact
         target = prepare_workspace(target, Path(workspace), name=target.stem)
     if target.is_relative_to(PROJECT_DIR) or harness.is_relative_to(PROJECT_DIR):
         raise ValueError('Use target and editable harness paths outside the LightRE repository')
-    _target(target)
+    target_info(target)
     config = {'path': str(harness), 'parameters': {'main_class': main_class},
               'cases': str(Path(cases_file).resolve()), 'artifacts': list(artifacts)}
     if verification != 'expected':
@@ -245,7 +245,7 @@ def configure(target, *, harness, cases_file, main_class, checker=None, artifact
         raise ValueError('Fixed cases must be outside the editable harness')
     harness.mkdir(parents=True, exist_ok=True)
     with exclusive(target, harness):
-        ensure(harness, target.name, instructions=instructions)
+        ensure_guide(harness, target.name, instructions=instructions)
         Contract({'parameters': config['parameters'], 'artifacts': config['artifacts'],
                   'verification': verification},
                  read_json(config['cases']), Path(config['checker']) if checker else None)

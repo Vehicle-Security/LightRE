@@ -37,25 +37,28 @@ button{cursor:pointer}
 button:disabled{cursor:default;opacity:.5}
 button:focus-visible,input:focus-visible,textarea:focus-visible,a:focus-visible,.sidebar-resizer:focus-visible,.code-resizer:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 header{flex-shrink:0;background:var(--chrome)}
-.topbar-main{min-height:60px;display:flex;align-items:center;padding:8px 16px;border-bottom:1px solid var(--line);gap:18px}
+.topbar-main{min-height:44px;display:flex;align-items:center;padding:4px 16px;border-bottom:1px solid var(--line);gap:18px}
 .brand{font-size:20px;font-weight:650;letter-spacing:-.8px;white-space:nowrap}
 .brand span{color:var(--accent)}
 .version{font:10px var(--mono);color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:3px 5px;margin-left:8px;vertical-align:middle;letter-spacing:0}
 .sample{min-width:160px;flex:0 1 320px}
 .eyebrow{font-size:8px;letter-spacing:1.5px;color:var(--muted);margin-bottom:2px}
 .sample-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:550}
-.topbar-status{min-width:220px;flex:1;overflow:hidden}
-.topbar-status .analysis-caption{min-width:0}
-.topbar-status .analysis-caption strong{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.topbar-status .recovery-status{display:block;max-width:none;margin:1px 0 0;color:var(--muted);font-size:12px;line-height:17px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.topbar-status{max-width:520px;flex:0 1 520px;min-width:0;overflow:hidden;margin-left:auto}
+.topbar-status .analysis-caption{min-width:0;max-width:100%;flex-direction:column;align-items:flex-start;gap:1px;overflow:hidden}
+.topbar-status .analysis-caption strong{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;line-height:17px;color:var(--text)}
+.topbar-status .analysis-caption span{max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.topbar-status[data-state=error] strong{color:var(--error)}
 .header-actions{display:flex;align-items:center;gap:8px}
-.analysis-progress{flex-shrink:0;padding:8px 16px 7px;border-bottom:1px solid var(--line);background:var(--panel)}
+.analysis-progress{padding:0 16px;background:var(--panel)}
 .analysis-caption{display:flex;justify-content:space-between;gap:12px;align-items:center}
 .analysis-caption strong{font-size:15px;line-height:21px;font-weight:650}
 .analysis-caption span{color:var(--muted);font:11px var(--mono);white-space:nowrap}
 .analysis-progress[data-state=error] strong{color:var(--error)}
 .analysis-progress details{margin-top:7px;color:var(--muted);font-size:11px}
-.analysis-progress details summary{cursor:pointer;user-select:none;color:var(--text)}
+.analysis-progress details summary{display:flex;justify-content:space-between;align-items:center;gap:16px;cursor:pointer;user-select:none;color:var(--text)}
+.analysis-log-label{flex:0 0 auto;color:var(--text)}
+.analysis-log-caption{padding-top:7px;color:var(--text);font-size:11px}
 .analysis-log-body{margin-top:7px}
 .analysis-bar{height:5px;overflow:hidden;background:var(--line);border-radius:3px}
 .analysis-bar-fill{height:100%;width:35%;background:var(--accent);border-radius:3px;transform:translateX(-120%)}
@@ -112,6 +115,7 @@ main{display:flex;flex-direction:column;min-height:0;min-width:0}
 h1{min-width:0;font:500 16px var(--mono);margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .function-meta{font:11px var(--mono);color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 16px}
 .function-meta strong{color:var(--accent);font-weight:400}
+.reanalyze-function{margin-left:auto}
 .code-tab{height:28px;display:flex;align-items:center;border-bottom:1px solid var(--line);padding:0 16px;gap:12px;justify-content:space-between;flex-shrink:0}
 .code-tabs{display:inline-flex;align-items:center;gap:3px;flex-shrink:0}
 .view-tab{display:flex;align-items:center;justify-content:center;height:22px;border:0;border-radius:3px;background:none;color:var(--muted);padding:0 7px;font-size:12px;line-height:18px;gap:5px;white-space:nowrap}
@@ -164,11 +168,21 @@ h1{min-width:0;font:500 16px var(--mono);margin:0;overflow:hidden;text-overflow:
 .queue-functions button{color:var(--accent)}
 .recovery-status{font-size:11px;color:var(--muted)}
 .task-queue{flex-shrink:0;border-bottom:1px solid var(--line);background:var(--chrome);font-size:11px;color:var(--muted)}
-.task-queue summary{padding:4px 16px;cursor:pointer}
+.task-queue summary{display:flex;align-items:center;gap:12px;padding:5px 16px;cursor:pointer}
+.task-queue summary #queue-summary{flex:0 0 auto;color:var(--text)}
+.task-queue summary #active-task{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
+.task-detail{padding:5px 16px 4px;border-top:1px solid var(--line);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.task-module{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:7px 16px 5px;border-top:1px solid var(--line)}
+.task-module strong{font-weight:550;color:var(--text)}
+.task-module-actions{display:flex;flex-wrap:wrap;gap:6px}
+.task-module-error{flex-basis:100%;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--error)}
+.task-module+.task-detail{border-top:0}
+#rehost-status[data-state=error]{color:var(--error)}
 .task-queue .clear-tasks{float:right;margin-left:12px;padding:0 6px;font-size:11px}
 .queue-list{max-height:160px;overflow:auto;padding:0 16px 4px}
-.queue-row{display:flex;align-items:center;gap:10px;padding:3px 0;border-top:1px solid var(--line)}
-.queue-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
+.queue-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-start;gap:4px 12px;padding:5px 0;border-top:1px solid var(--line)}
+.queue-label{min-width:0;max-width:100%;text-align:left;overflow-wrap:anywhere;color:var(--text)}
+.queue-status{max-width:100%;text-align:left;overflow-wrap:anywhere}
 .notes{padding:6px 16px;color:var(--muted)}
 .notes pre{white-space:pre-wrap;font:12px/1.6 var(--mono)}
 .candidate-code{margin:0;padding:4px 16px 12px;font:12px/22px var(--mono);white-space:pre;tab-size:4}
@@ -207,13 +221,19 @@ footer{height:22px;flex-shrink:0;display:flex;align-items:center;justify-content
 ::-webkit-scrollbar-track{background:transparent}
 [hidden]{display:none!important}
 @media(max-width:800px){
-  .topbar-main{padding:7px 12px;gap:14px}
+  .topbar-main{padding:4px 12px;gap:14px}
   .sample{min-width:120px;flex-basis:240px}
   .topbar-status{min-width:0}
   .columns,.function{font-size:10px}
   .code-note{display:none}
 }
 @media(max-width:520px){
+  .topbar-main{flex-wrap:wrap;gap:6px 12px}
+  .sample{flex:1;min-width:0}
+  .topbar-status{order:1;flex:1 0 100%;max-width:100%;margin-left:0}
+  .task-queue summary{flex-wrap:wrap;gap:5px 10px}
+  .task-queue summary #active-task{flex-basis:50%}
+  .task-queue .clear-tasks{margin-left:0}
   .layout{--sidebar-width:220px}
   .columns,.function{grid-template-columns:minmax(0,1fr) 44px}
   .columns .name-label{display:none}
@@ -232,13 +252,10 @@ footer{height:22px;flex-shrink:0;display:flex;align-items:center;justify-content
  <div class="topbar-main">
   <div class="brand">Light<span>RE</span><span class="version">0.2</span></div>
   <div class="sample"><div class="eyebrow">WORKSPACE</div><div id="sample-name" class="sample-name">正在打开工作区…</div></div>
-  <div class="topbar-status">
-    <div class="analysis-caption"><strong id="analysis-stage" role="status" aria-live="polite">正在连接后台分析…</strong><span id="analysis-time"></span></div>
-    <span id="recovery-status" class="recovery-status" role="status" aria-live="polite">正在准备分析…</span>
+  <div id="analysis-status" class="topbar-status" role="status" aria-live="polite">
+    <div class="analysis-caption"><strong id="analysis-stage">正在读取分析进度…</strong><span id="analysis-time"></span></div>
   </div>
   <div class="header-actions">
-    <button id="resume-recovery" class="load-more" title="处理全部尚无候选的函数" hidden>继续还原</button>
-    <button id="stop-recovery" class="load-more" hidden>暂停</button>
     <button id="theme-toggle" class="toolbar-button theme-toggle" aria-label="切换浅色或深色模式">
       <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg>
       <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M20 14.3A8.5 8.5 0 0 1 9.7 4a8.5 8.5 0 1 0 10.3 10.3Z"/></svg>
@@ -246,10 +263,24 @@ footer{height:22px;flex-shrink:0;display:flex;align-items:center;justify-content
   </div>
 </div>
 </header>
-<div id="analysis-progress" class="analysis-progress" aria-label="分析日志">
-  <details id="analysis-log" open hidden><summary>查看分析日志</summary><div class="analysis-log-body"><div id="analysis-bar" class="analysis-bar" data-mode="indeterminate" role="progressbar" aria-label="当前阶段进度"><div id="analysis-bar-fill" class="analysis-bar-fill"></div></div><pre id="analysis-log-text"></pre></div></details>
-</div>
-<details id="task-queue" class="task-queue"><summary><span id="queue-summary">任务队列</span><button id="clear-tasks" class="load-more clear-tasks" type="button" title="清除已结束任务及回复的展示；日志留档，保留源码和 Knowledge" disabled>清除已结束任务</button></summary><div id="queue-list" class="queue-list"></div></details>
+<details id="task-queue" class="task-queue">
+  <summary><span id="queue-summary">任务详情</span><span id="active-task" class="task-state" role="status" aria-live="polite">正在准备分析…</span><button id="clear-tasks" class="load-more clear-tasks" type="button" title="清除已结束任务及回复的展示；日志留档，保留源码和 Knowledge" disabled>清除已结束任务</button></summary>
+  <div id="recovery-controls" class="task-module" role="group" aria-label="Recovery 队列操作" hidden>
+    <strong>Recovery · 函数分析与修改建议</strong>
+    <div class="task-module-actions">
+      <button id="resume-recovery" class="load-more" type="button" hidden>恢复队列</button>
+      <button id="stop-recovery" class="load-more" type="button" title="暂停 Recovery 函数分析与修改建议队列" hidden>暂停队列</button>
+    </div>
+  </div>
+  <div id="recovery-status" class="recovery-status task-detail" role="status" aria-live="polite">正在准备分析…</div>
+  <div id="analysis-progress" class="analysis-progress" aria-label="分析日志"><div id="analysis-log" hidden><div class="analysis-log-caption">查看分析日志</div><div class="analysis-log-body"><div id="analysis-bar" class="analysis-bar" data-mode="indeterminate" role="progressbar" aria-label="当前阶段进度"><div id="analysis-bar-fill" class="analysis-bar-fill"></div></div><pre id="analysis-log-text"></pre></div></div></div>
+  <div id="queue-list" class="queue-list"></div>
+  <div id="rehost-task" class="task-module" hidden>
+    <strong>Rehost · 运行验证</strong>
+    <span id="rehost-status" role="status" aria-live="polite"></span>
+    <div id="rehost-error" class="task-module-error" hidden></div>
+  </div>
+</details>
 <div class="layout">
   <aside id="sidebar" aria-label="函数导航">
     <div class="sidebar-heading"><span>函数</span><span id="function-count" class="count">— 已识别</span></div>
@@ -270,7 +301,7 @@ footer{height:22px;flex-shrink:0;display:flex;align-items:center;justify-content
   </aside>
   <div id="sidebar-resizer" class="sidebar-resizer" role="separator" aria-label="调整函数列表宽度" aria-orientation="vertical" aria-controls="sidebar" tabindex="0" title="拖动调整左栏宽度；双击恢复紧凑宽度；方向键微调"></div>
   <main>
-    <div class="function-header"><h1 id="function-name">选择一个函数</h1><div class="function-meta"><span>RVA <strong id="function-rva">—</strong></span><span id="instruction-total">ARM64 · 原始汇编</span></div></div>
+    <div class="function-header"><h1 id="function-name">选择一个函数</h1><div class="function-meta"><span>RVA <strong id="function-rva">—</strong></span><span id="instruction-total">ARM64 · 原始汇编</span></div><button id="reanalyze-function" class="load-more reanalyze-function" title="重新分析本函数，改善命名、类型和可读性；保留现有代码作为输入" hidden>重新分析</button></div>
     <div class="code-tab"><div class="code-tabs" role="tablist" aria-label="函数视图">
       <button id="tab-assembly" class="view-tab" role="tab" aria-selected="true" aria-controls="assembly-pane" title="仅显示原始汇编">
         <svg class="tab-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M7 5h10M7 10h10M7 15h10M3 5h.5M3 10h.5M3 15h.5"/></svg>
@@ -328,11 +359,18 @@ const showsAssembly = () => activeView !== 'candidate';
 const showsCandidate = () => activeView !== 'assembly';
 const viewFooter = () => 'ARM64 / RVA · ' + ({assembly:'原始汇编', candidate:'候选未验证', split:'汇编 / 候选未验证'})[activeView];
 let candidateController, candidateData = null, recoveryTimer;
-let feedbackController, feedbackFingerprint, feedbackSubmitting = false;
-let functionStatuses = {}, activeRvas = new Set(), queuedRvas = new Set(), listStatusFingerprint;
+let feedbackController, feedbackFingerprint, feedbackSubmitting = false, feedbackTaskActive = false, candidateTaskWasActive = false;
+let functionStatuses = {}, activeRvas = new Set(), queuedRvas = new Set(), listStatusFingerprint, sourceNamesFingerprint;
 const statusLabels = {failed:'CLI 执行失败，尚无模型结果；可继续重试', llm:'LLM 已处理，有候选，未经执行验证', unresolved:'有分析记录，尚未解决；可展开分析上下文',
   running:'LLM 正在处理', queued:'已有排队任务', ghidra:'仅有 Ghidra 初稿，等待 LLM 处理', pending:'待处理，尚无源码', unknown:'正在读取处理状态'};
 const statusSymbols = {failed:'!', llm:'✓', unresolved:'?', running:'◌', queued:'↥', ghidra:'G', pending:'·', unknown:'·'};
+const rehostLabels = {waiting_for_recovery: 'Rehost 等待 Recovery', running: 'Rehost 正在生成和运行 harness',
+  complete: 'Rehost 本轮验证完成', observed: 'Rehost 已记录运行观察（未经等价验证）',
+  limited: 'Rehost 本轮达到限制', cancelled: 'Rehost 已取消', error: 'Rehost 执行失败'};
+function renderFunctionCount() {
+  const candidates = recoveryProgress?.candidates;
+  $('function-count').textContent = `${functions.length} 已识别` + (candidates == null ? '' : ` · LLM ${candidates}`);
+}
 const drafts = new Map();
 const clearingTaskHistory = new Set();
 const cancellingSuggestions = new Set();
@@ -719,6 +757,7 @@ async function refreshFeedback() {
       await loadCandidate(true);
       if (id !== requestId || feedbackController !== pending) return;
     }
+    feedbackTaskActive = data.items.some(item => ['queued', 'running', 'interrupted'].includes(item.status));
     const fingerprint = JSON.stringify(data);
     if (fingerprint === feedbackFingerprint) return;
     renderSourceProgress(data);
@@ -782,32 +821,50 @@ async function refreshFeedback() {
 
 function renderServiceProgress() {
   const data = serviceState, workflow = data.workflow, recovery = recoveryProgress;
+  const rehost = workflow?.rehost;
+  $('rehost-task').hidden = !data.ready || !rehost;
+  $('rehost-status').textContent = rehost ? rehostLabels[rehost.status] || `Rehost · ${rehost.status}` : '';
+  $('rehost-status').dataset.state = rehost?.status || '';
+  $('rehost-error').textContent = rehost?.error || '';
+  $('rehost-error').hidden = !rehost?.error;
   let label = data.message || '分析工作区已就绪', detail = '探索目录 → Ghidra 静态分析 → Recovery → Rehost';
   let error = data.error, active = !data.ready || data.phase === 'recovery_starting', count = null;
-  if (data.ready && !error && recovery && workflow) {
-    const task = recovery.task;
+  let summary = !data.ready && data.phase_elapsed_seconds != null ? `当前阶段已用 ${data.phase_elapsed_seconds} 秒` : '';
+  if (data.ready && !error && recovery) {
+    const jobs = recovery.queue || [];
+    const task = jobs.find(job => job.status === 'running') || jobs.find(job => job.status === 'queued') || recovery.task;
+    summary = `LLM 已处理 ${recovery.candidates}/${recovery.total} 个函数` +
+      (recovery.unresolved ? ` · 未解决 ${recovery.unresolved}` : '') +
+      (recovery.failed ? ` · 执行失败 ${recovery.failed}` : '');
+    detail = $('recovery-status').textContent;
     active = !recovery.paused && ['queued', 'running'].includes(task.status);
     if (active) {
-      label = `Recovery · 已处理 ${task.processed || 0}/${task.total || recovery.total} 个函数`;
-      detail = $('recovery-status').textContent;
+      const mode = {comment: '处理修改建议', targeted: '定向分析', initial: '首轮分析'}[task.mode] || 'Recovery';
+      label = `${mode} · ${task.status === 'queued' ? '等待执行' : `已处理 ${task.processed || 0}/${task.total || recovery.total}`}`;
       count = {value: task.processed || 0, total: task.total || recovery.total};
-    } else if (workflow.rehost) {
-      const rehost = workflow.rehost;
-      const labels = {waiting_for_recovery: 'Rehost 等待 Recovery', running: 'Rehost 正在生成和运行 harness',
-        complete: 'Rehost 本轮验证完成', observed: 'Rehost 已记录运行观察（未经等价验证）',
-        limited: 'Rehost 本轮达到限制', cancelled: 'Rehost 已取消', error: 'Rehost 执行失败'};
-      label = labels[rehost.status] || `Rehost · ${rehost.status}`;
-      detail = $('recovery-status').textContent;
+    } else if (recovery.paused && !['running', 'error'].includes(rehost?.status)) {
+      label = 'Recovery 队列已暂停';
+    } else if (rehost) {
+      label = rehostLabels[rehost.status] || `Rehost · ${rehost.status}`;
       active = ['waiting_for_recovery', 'running'].includes(rehost.status);
       error = rehost.error;
+    } else {
+      const labels = {complete: 'Recovery 本轮完成', partial: 'Recovery 有未解决项', error: 'Recovery 执行失败',
+        interrupted: 'Recovery 队列已中断', cancelled: 'Recovery 已取消', idle: '暂无执行中的任务'};
+      label = labels[task.status] || 'Recovery 等待任务';
+      error = task.error;
     }
+    if (recovery.queued) summary += ` · 排队 ${recovery.queued}`;
   }
-  $('analysis-progress').hidden = !active && !data.log_path && !error;
-  $('analysis-progress').dataset.state = error ? 'error' : active ? 'running' : 'ready';
+  if (data.error) label = '分析启动失败';
   $('analysis-stage').textContent = label;
-  $('analysis-time').textContent = data.elapsed_seconds == null ? '' :
-    `${!data.ready && data.phase_elapsed_seconds != null ? `当前阶段 ${data.phase_elapsed_seconds} 秒 · ` : ''}启动后 ${data.elapsed_seconds} 秒`;
-  $('recovery-status').textContent = error || detail;
+  $('analysis-time').textContent = summary;
+  $('analysis-status').dataset.state = error ? 'error' : active ? 'running' : 'ready';
+  $('analysis-status').title = [label, summary, error].filter(Boolean).join('\n');
+  $('analysis-progress').hidden = false;
+  $('analysis-progress').dataset.state = error ? 'error' : active ? 'running' : 'ready';
+  $('active-task').textContent = label;
+  $('recovery-status').textContent = data.ready && recovery ? detail : error || detail;
   const bar = $('analysis-bar');
   bar.hidden = !active || !!error;
   if (count && count.total > 0) {
@@ -820,9 +877,10 @@ function renderServiceProgress() {
     $('analysis-bar-fill').style.width = '35%';
     bar.removeAttribute('aria-valuenow');
   }
-  $('analysis-log').hidden = !active && !data.log_path && !error;
+  const staticActive = !data.ready && active;
+  $('analysis-log').hidden = !staticActive && !data.log_path && !data.error;
   $('analysis-log-text').textContent = data.log_path ? `${data.log_path}\n${data.log_tail || '等待 Ghidra 写入日志…'}` :
-    (active ? '等待静态分析日志路径…' : error || '');
+    (staticActive ? '等待静态分析日志路径…' : data.error || '');
 }
 
 async function refreshStatus() {
@@ -843,14 +901,17 @@ async function refreshStatus() {
       placeholder.className = 'list-empty'; placeholder.textContent = label;
       $('functions').replaceChildren(placeholder);
       $('footer-state').textContent = serviceState.status === 'error' ? '分析启动失败' : '后台分析中';
-      $('resume-recovery').hidden = true;
+      $('recovery-controls').hidden = true;
       if (serviceState.directory || serviceState.workspace) $('workspace').textContent = serviceState.directory || serviceState.workspace;
     }
   } catch (error) {
     $('analysis-stage').textContent = '分析进度连接失败，正在重试';
+    $('analysis-status').dataset.state = 'error';
+    $('analysis-status').title = error.message;
+    $('active-task').textContent = '分析进度连接失败，正在重试';
     $('recovery-status').textContent = error.message;
   }
-  statusTimer = setTimeout(refreshStatus, serviceState.ready ? 3000 : 1500);
+  statusTimer = setTimeout(refreshStatus, serviceState.ready ? 5000 : 2000);
 }
 
 async function refreshRecovery() {
@@ -862,21 +923,36 @@ async function refreshRecovery() {
     const labels = {idle:'空闲', queued:'排队中', running:'分析中', complete:'本轮完成', partial:'有未解决函数', error:'分析出错', interrupted:'已暂停', cancelled:'已取消'};
     const phases = {ghidra:'Ghidra 分析中', source:'整理模块与初稿'};
     const concurrency = data.concurrency || {in_use:task.active_batches || 0, limit:task.effective_workers || task.workers};
-    $('recovery-status').textContent = `源码 ${data.source_functions}/${data.total} · LLM ${data.candidates} · 未解决 ${data.unresolved || 0}${data.failed ? ` · 执行失败 ${data.failed}` : ''} · ${data.paused ? '队列已暂停' : running && phases[task.phase] || labels[task.status] || task.status}` +
+    const activeBatches = concurrency.in_use || task.active_batches || 0;
+    $('recovery-status').textContent = `源码 ${data.source_functions}/${data.total} · LLM ${data.candidates} · 分析中 ${activeBatches} · 未解决 ${data.unresolved || 0}${data.failed ? ` · 执行失败 ${data.failed}` : ''} · ${data.paused ? '队列已暂停' : running && phases[task.phase] || labels[task.status] || task.status}` +
       (running && concurrency.limit ? ` · 并发 ${concurrency.in_use}/${concurrency.limit}` : '') + (data.queued ? ` · 排队 ${data.queued}` : '');
     $('recovery-status').title = task.error || task.ghidra?.error || (task.directory ? `日志与任务：${task.directory}` : '');
     recoveryProgress = data;
+    renderFunctionCount();
     renderServiceProgress();
-    $('stop-recovery').hidden = !running;
-    const interrupted = task.status === 'interrupted' || (data.queue || []).some(job => job.status === 'interrupted');
-    $('resume-recovery').hidden = !data.paused && (running || data.candidates === data.total && !data.queued && !interrupted);
+    renderRecoveryControls(data);
     const waiting = (data.queue || []).filter(job => job.status === 'queued').flatMap(job => {
       const done = new Set(job.done_rvas || []); return (job.rvas || []).filter(rva => !done.has(rva));
     });
     renderQueue(data);
-    if (showsCandidate()) await refreshFeedback();
+    const selectedStatus = selected == null ? null : data.function_statuses?.[selected.rva];
+    const selectedTaskActive = ['queued', 'running'].includes(selectedStatus);
+    const refreshSelectedFeedback = showsCandidate() && (!feedbackFingerprint || feedbackTaskActive || selectedTaskActive || candidateTaskWasActive);
+    if (refreshSelectedFeedback) await refreshFeedback();
+    const namesFingerprint = JSON.stringify([data.source_functions, (data.queue || [task]).map(job =>
+      [job.id, job.processed, job.status])]);
+    if (namesFingerprint !== sourceNamesFingerprint) {
+      const catalog = await getJSON('/api/functions');
+      const names = new Map(catalog.functions.map(fn => [fn.rva, fn.source_name]));
+      functions = functions.map(fn => ({...fn, source_name: names.get(fn.rva)}));
+      if (selected) {
+        selected.source_name = names.get(selected.rva);
+        $('function-name').textContent = selected.source_name || selected.name;
+      }
+      sourceNamesFingerprint = namesFingerprint;
+    }
     const current = (data.queue || [task]).filter(job => job.status === 'running').flatMap(job => job.current || []);
-    const listFingerprint = JSON.stringify([data.function_statuses, running ? current : [], waiting]);
+    const listFingerprint = JSON.stringify([data.function_statuses, running ? current : [], waiting, namesFingerprint]);
     if (listFingerprint !== listStatusFingerprint) {
       functionStatuses = data.function_statuses || {};
       activeRvas = new Set(running ? current.map(rva => Number.parseInt(rva, 16)) : []);
@@ -885,18 +961,50 @@ async function refreshRecovery() {
       const scrollTop = $('functions').scrollTop;
       renderList(); $('functions').scrollTop = scrollTop;
     }
-    if (showsCandidate() && !$('feedback-comment').value.trim()) await loadCandidate(true);
+    if (showsCandidate() && !$('feedback-comment').value.trim() &&
+        (!candidateData || selectedTaskActive || candidateTaskWasActive)) await loadCandidate(true);
+    candidateTaskWasActive = selectedTaskActive;
   } catch (error) {
     $('recovery-status').textContent = '进度读取失败'; $('recovery-status').title = error.message;
   }
-  recoveryTimer = setTimeout(refreshRecovery, 3000);
+  recoveryTimer = setTimeout(refreshRecovery, 5000);
+}
+
+function renderRecoveryControls(data) {
+  $('recovery-controls').hidden = false;
+  const jobs = [...(data.queue || []), data.task];
+  const active = jobs.some(job => ['queued', 'running'].includes(job.status));
+  const resumable = data.paused || jobs.some(job => job.status === 'interrupted');
+  const remaining = Math.max(0, data.total - data.candidates);
+  const resume = $('resume-recovery'), stop = $('stop-recovery');
+  stop.hidden = data.paused || !active;
+  resume.hidden = !resumable && (active || !remaining);
+  resume.textContent = resumable ? '恢复队列' : `分析剩余 ${remaining} 个函数`;
+  resume.title = resumable ? '恢复 Recovery 函数分析与修改建议队列' : '提交尚无 LLM 候选的函数到 Recovery 队列';
 }
 
 async function controlRecovery(stop = false) {
+  const button = $(stop ? 'stop-recovery' : 'resume-recovery');
+  button.disabled = true;
   try {
     await postJSON(stop ? '/api/recovery/stop' : '/api/recovery');
     await refreshRecovery();
   } catch (error) { $('recovery-status').textContent = error.message; }
+  finally { button.disabled = false; }
+}
+
+async function reanalyzeFunction() {
+  if (!selected) return;
+  const button = $('reanalyze-function'), rva = selected.rva;
+  button.disabled = true; button.textContent = '提交中…';
+  try {
+    await postJSON(`/api/functions/${hex(rva)}/recover`);
+    await refreshRecovery();
+  } catch (error) {
+    $('recovery-status').textContent = error.message;
+  } finally {
+    button.disabled = false; button.textContent = '重新分析';
+  }
 }
 
 async function selectTaskFunction(rva, showIssue = false) {
@@ -916,7 +1024,9 @@ function renderQueue(data) {
   const expanded = new Map(Array.from($('queue-list').querySelectorAll('.queue-functions'))
     .filter(item => !item.hidden).map(item => [item.dataset.taskId, item.dataset.scope]));
   const pending = jobs.filter(job => ['queued','running','interrupted'].includes(job.status));
-  $('queue-summary').textContent = `任务队列 · 执行中 ${jobs.filter(job => job.status === 'running').length} · 等待 ${data.queued || 0}` + (data.paused ? ' · 已暂停' : ' · 建议优先');
+  const runningCount = jobs.filter(job => job.status === 'running').length;
+  $('queue-summary').textContent = '任务详情' + (runningCount ? ` · 执行中 ${runningCount}` : '') +
+    (data.queued ? ` · 等待 ${data.queued}` : '') + (data.paused ? ' · 已暂停' : '');
   const states = {queued:'等待', running:'执行中', interrupted:'已暂停', complete:'完成', partial:'有未解决项', error:'失败', cancelled:'已取消'};
   const recent = jobs.filter(job => !pending.includes(job)).sort((a,b) => b.created_at-a.created_at).slice(0, 5);
   const fragment = document.createDocumentFragment();
@@ -951,9 +1061,10 @@ function renderQueue(data) {
     label.title = `${job.id}\n${job.directory}\n${job.comment || ''}`;
     const targets = job.issues?.length ? issueRvas : rvas;
     const status = document.createElement(targets.length ? 'button' : 'span');
-    status.textContent = `${states[job.status] || job.status} · ${job.processed || 0}/${job.total}${job.failed_count ? ` · 执行失败 ${job.failed_count}` : ''}`;
+    status.className = 'queue-status';
+    status.textContent = `${states[job.status] || job.status} · ${job.processed || 0}/${job.total}${(job.changed !== undefined || job.unchanged !== undefined) ? ` · 代码改进 ${job.changed || 0} · 保留 ${job.unchanged || 0}` : ''}${job.failed_count ? ` · 执行失败 ${job.failed_count}` : ''}`;
     if (targets.length) {
-      status.className = 'queue-jump';
+      status.classList.add('queue-jump');
       status.title = targets.length === 1 ? `查看函数 ${hex(targets[0])} 及分析记录` : '展开相关函数，按 RVA 选择';
       status.onclick = () => navigate(targets, true);
     }
@@ -980,19 +1091,19 @@ function renderList() {
   const filter = $('status-filter').value;
   const addressQuery = query.replace(/^0x/, '').replace(/^0+/, '') || '0';
   const visible = functions.filter(f => (filter === 'all' || (filter === 'running' ? activeRvas.has(f.rva) :
-    filter === 'queued' ? queuedRvas.has(f.rva) : functionStatuses[f.rva] === filter)) && (!query || f.name.toLowerCase().includes(query) ||
+    filter === 'queued' ? queuedRvas.has(f.rva) : functionStatuses[f.rva] === filter)) && (!query || (f.source_name || f.name).toLowerCase().includes(query) || f.name.toLowerCase().includes(query) ||
     hex(f.rva).includes(query) || f.rva.toString(16).includes(addressQuery))).sort(compareFunctions);
   $('clear').hidden = !query;
   const fragment = document.createDocumentFragment();
   for (const fn of visible) {
     const status = activeRvas.has(fn.rva) ? 'running' : queuedRvas.has(fn.rva) ? 'queued' : functionStatuses[fn.rva] || 'unknown';
     const row = document.createElement('button'); row.className = 'function'; row.dataset.rva = fn.rva;
-    row.setAttribute('aria-current', String(selected?.rva === fn.rva)); row.title = `${fn.name} · ${hex(fn.rva)} · ${fn.instructions.toLocaleString()} 行汇编 · ${statusLabels[status]}`;
+    row.setAttribute('aria-current', String(selected?.rva === fn.rva)); row.title = `${fn.source_name || fn.name} (${fn.name}) · ${hex(fn.rva)} · ${fn.instructions.toLocaleString()} 行汇编 · ${statusLabels[status]}`;
     const address = document.createElement('span'); address.className = 'addr'; address.textContent = hex(fn.rva);
     const name = document.createElement('span'); name.className = 'name';
     const marker = document.createElement('span'); marker.className = 'function-status'; marker.dataset.status = status;
     marker.textContent = statusSymbols[status]; marker.setAttribute('aria-label', statusLabels[status]);
-    const nameText = document.createElement('span'); nameText.className = 'name-text'; nameText.textContent = fn.name;
+    const nameText = document.createElement('span'); nameText.className = 'name-text'; nameText.textContent = fn.source_name || fn.name;
     name.append(marker, nameText);
     const lines = document.createElement('span'); lines.className = 'lines'; lines.textContent = fn.instructions.toLocaleString();
     row.append(address, name, lines); row.onclick = () => selectFunction(fn); fragment.append(row);
@@ -1030,14 +1141,16 @@ async function selectFunction(fn, recordHistory = true) {
   const previous = selected;
   controller?.abort(); candidateController?.abort(); feedbackController?.abort(); requestId++; selected = fn;
   feedbackFingerprint = null; $('feedback-history').replaceChildren(); $('feedback-history').hidden = true;
+  feedbackTaskActive = false; candidateTaskWasActive = false;
   $('source-progress').hidden = true;
   candidateData = null; $('feedback-comment').value = drafts.get(fn.rva) || ''; $('feedback-message').textContent = '';
   loaded = 0; nextOffset = 0; busy = false; loadFailed = false;
   const url = new URL(location.href); url.hash = hex(fn.rva);
   if (recordHistory && previous && previous.rva !== fn.rva) history.pushState(null, '', url);
   else history.replaceState(null, '', url);
-  $('function-name').textContent = fn.name; $('function-rva').textContent = hex(fn.rva);
+  $('function-name').textContent = fn.source_name || fn.name; $('function-rva').textContent = hex(fn.rva);
   $('instruction-total').textContent = `${fn.instructions.toLocaleString()} 条指令 · ARM64`;
+  $('reanalyze-function').hidden = false;
   for (const id of ['code-scroll', 'candidate-scroll']) { $(id).scrollTop = 0; $(id).scrollLeft = 0; }
   renderList(); message('正在读取已保存的汇编…');
   const reads = [];
@@ -1089,7 +1202,7 @@ async function refreshFunctions() {
     $('sample-name').textContent = sample.name; $('sample-name').title = sample.source_path;
     document.title = `${sample.name} · LightRE`;
     $('workspace').textContent = sample.directory; $('workspace').title = sample.directory;
-    $('function-count').textContent = `${functions.length} 已识别`;
+    renderFunctionCount();
     if (sample.error) {
       if (!selected) message(sample.error, true);
     }
@@ -1099,10 +1212,10 @@ async function refreshFunctions() {
       selectFunction(functions.find(f => f.rva === anchor) || [...functions].sort(compareFunctions)[0]);
     } else if (selected) {
       const updated = functions.find(f => f.rva === selected.rva);
-      if (updated && (updated.instructions !== selected.instructions || updated.name !== selected.name)) selectFunction(updated);
+      if (updated && (updated.instructions !== selected.instructions || updated.name !== selected.name || updated.source_name !== selected.source_name)) selectFunction(updated);
     } else if (sample.state === 'ready') message('分析工具未识别出函数。可以让 Agent 继续调查这个样本。');
     $('footer-state').textContent = viewFooter();
-    if (!['ready','error'].includes(sample.state)) refreshTimer = setTimeout(refreshFunctions, 1500);
+    if (!['ready','error'].includes(sample.state)) refreshTimer = setTimeout(refreshFunctions, 3000);
   } catch (error) {
     $('footer-state').textContent = '连接失败，正在重试';
     if (!selected) message(`无法读取函数列表：${error.message}`, true,
@@ -1119,6 +1232,7 @@ $('feedback-comment').addEventListener('keydown', event => {
 $('submit-comment').onclick = submitFeedback;
 $('clear-tasks').onclick = event => { event.preventDefault(); event.stopPropagation(); clearTaskHistory(); };
 $('cancel-suggestion').onclick = cancelCurrentSuggestion;
+$('reanalyze-function').onclick = reanalyzeFunction;
 $('resume-recovery').onclick = () => controlRecovery();
 $('stop-recovery').onclick = () => controlRecovery(true);
 $('search').addEventListener('input', renderList);

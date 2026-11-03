@@ -1,6 +1,7 @@
 """A detached Codex task per SO with bounded parallel batches; files are the durable task record."""
 
 import fcntl
+import difflib
 from collections import Counter, deque
 import json
 import os
@@ -20,7 +21,7 @@ from .candidates import candidate_origins, candidate_rvas, migrate_candidates, m
 from .source import prepare_source
 from .formatting import FormattingError, format_code
 from .knowledge import _entry, _normalize, _validate, knowledge_rvas, migrate_knowledge, read_knowledge, save_knowledge_batch
-from .skills import skill_catalog
+from .skills import snapshot_skill
 
 PROMPTS = Path(__file__).parent / 'prompts'
 
@@ -28,7 +29,7 @@ MAX_BATCH_INSTRUCTIONS = 4000
 MAX_BATCH_FUNCTIONS = 32
 MAX_BATCH_CONTEXT_CHARS = 60000
 MAX_PROMPT_CHARS = 1_048_576  # Codex turn/start input limit, measured with a full assembly prompt.
-INITIAL_BATCH_TIMEOUT = 180
+INITIAL_BATCH_TIMEOUT = 600
 FEEDBACK_BATCH_TIMEOUT = 600
 MAX_BATCH_RETRIES = 1
 RETRY_BACKOFF = 5
@@ -93,7 +94,7 @@ def progress(reader):
                 "unresolved" if fn["rva"] in attempted else origins.get(fn["rva"], "pending")
                 for fn in functions}
     fields = ('id', 'status', 'mode', 'priority', 'created_at', 'started_at', 'finished_at',
-              'total', 'processed', 'generated', 'failed_count', 'effective_workers', 'run_duration_seconds',
+              'total', 'processed', 'generated', 'changed', 'unchanged', 'rename_sync', 'failed_count', 'effective_workers', 'run_duration_seconds',
               'rvas', 'done_rvas', 'current', 'active_batches', 'workers', 'comment', 'directory', 'error', 'parent_task', 'followup_id', 'input_mode')
     queue = [{key: job[key] for key in fields if key in job} for job in jobs]
     for item, job in zip(queue, jobs):
@@ -145,18 +146,17 @@ def _batches(functions):
         yield batch
 
 
-def _schema(batch, initial=False, feedback=False):
+def _schema(batch, *, feedback=False):
     schema = {"type": "object", "additionalProperties": False, "required": ["results"], "properties": {
         "results": {"type": "array", "items": {"type": "object", "additionalProperties": False,
             "required": ["rva", "code", "notes"], "properties": {
                 "rva": {"type": "string", "enum": [f"{fn['rva']:#x}" for fn in batch]},
                 "code": {"type": ["string", "null"]}, "notes": {"type": "string", "minLength": 1}}}}}}
-    if initial or feedback:
-        item = schema['properties']['results']['items']
-        item['required'].append('edits')
-        item['properties']['edits'] = {'type': ['array', 'null'], 'items': {
-            'type': 'object', 'additionalProperties': False, 'required': ['old', 'new'],
-            'properties': {'old': {'type': 'string'}, 'new': {'type': 'string'}}}}
+    item = schema['properties']['results']['items']
+    item['required'].append('edits')
+    item['properties']['edits'] = {'type': ['array', 'null'], 'items': {
+        'type': 'object', 'additionalProperties': False, 'required': ['old', 'new'],
+        'properties': {'old': {'type': 'string'}, 'new': {'type': 'string'}}}}
     if feedback:
         item = schema['properties']['results']['items']
         item['required'].extend(['reply', 'knowledge_edits'])
@@ -166,8 +166,8 @@ def _schema(batch, initial=False, feedback=False):
     return schema
 
 
-def _initial_prompt(reader, state, batch, current, references):
-    """Prepare bounded first-pass context so the model need not investigate files."""
+def _reference_inputs(reader, batch, current, references, knowledge):
+    """Use current C as the baseline, falling back to the reference draft."""
     refs = {item['rva']: item for item in references}
     context = []
     sample = reader.catalog()['sample']
@@ -180,8 +180,9 @@ def _initial_prompt(reader, state, batch, current, references):
         if code:
             code = display_code(sample, rva, code)
         item = {**fn, 'code': code,
-                'producer': candidate['producer'], 'ghidra_error': reference.get('error'),
-                'knowledge': read_knowledge(reader, rva)}
+                'producer': candidate['producer'], 'sha256': candidate['sha256'], 'path': candidate['path'],
+                'ghidra_error': reference.get('error'),
+                'knowledge': knowledge[rva]}
         # Short ABI helpers benefit from seeing all instructions. Large functions
         # use Ghidra C; failed decompiles get an explicit, incomplete excerpt.
         if fn['instructions'] and (fn['instructions'] <= 32 or not item['code']):
@@ -194,33 +195,7 @@ def _initial_prompt(reader, state, batch, current, references):
             except (KeyError, RuntimeError) as error:
                 item['assembly_error'] = str(error)
         context.append(item)
-    prompt = render_prompt(PROMPTS / 'INITIAL.md',
-        FUNCTION_COUNT=len(batch),
-        SHA256=sample.get('sha256'),
-        IMAGE_BASE=sample.get('base', '0'),
-        CONTEXT=json.dumps(context, ensure_ascii=False))
-    return prompt, {f"{item['rva']:#x}": item['code'] for item in context}
-
-
-def _feedback_prompt(reader, state, current, knowledge):
-    """Inline the selected function; ask for a focused patch and a short reply."""
-    context, inputs = [], {}
-    for rva, candidate in current.items():
-        code = candidate['display_code']
-        inputs[f'{rva:#x}'] = code
-        item = {'rva': f'{rva:#x}', 'code': code, 'sha256': candidate['sha256'],
-                'path': candidate['path'], 'knowledge': knowledge[rva]}
-        reviewed = Path(state['directory']) / 'reviewed.c'
-        if candidate['sha256'] != state.get('expected_sha256') and reviewed.exists():
-            item['reviewed_snapshot'] = reviewed.read_text()
-        context.append(item)
-    prompt = render_prompt(PROMPTS / 'FEEDBACK.md',
-        COMMENT=json.dumps(state.get('comment', ''), ensure_ascii=False),
-        SOURCE_DIR=SOURCE_DIR,
-        DIRECTORY=reader.directory,
-        PYTHON=shlex.quote(sys.executable),
-        CONTEXT=json.dumps(context, ensure_ascii=False))
-    return prompt, inputs
+    return context
 
 
 def _start_batch(reader, state, number, batch):
@@ -232,49 +207,36 @@ def _start_batch(reader, state, number, batch):
                      or all(fn.get('input_mode') == 'assembly' for fn in batch))
     initial = state.get("mode") == "initial" and not assembly_only
     feedback = state.get('mode') == 'comment'
-    _write(schema, _schema(batch, initial=initial, feedback=feedback))
-    current = {fn["rva"]: read_candidate(reader, fn["rva"]) for fn in batch}
-    before = {rva: item["sha256"] for rva, item in current.items()}
-    knowledge = {rva: read_knowledge(reader, rva) for rva in current} if feedback else {}
-    if feedback:
-        _write(prefix.with_suffix('.before.json'), {
-            str(rva): {**{key: item[key] for key in ('display_code', 'sha256', 'path')}, 'knowledge': knowledge[rva]}
-            for rva, item in current.items()})
-    references = read_references(reader, list(before)) if not assembly_only and state.get("ghidra", {}).get("status") == "ready" else []
+    _write(schema, _schema(batch, feedback=feedback))
+    current = {fn['rva']: read_candidate(reader, fn['rva']) for fn in batch}
+    before = {rva: item['sha256'] for rva, item in current.items()}
+    knowledge = {rva: read_knowledge(reader, rva) for rva in current}
+    _write(prefix.with_suffix('.before.json'), {
+        str(rva): {**{key: item[key] for key in ('display_code', 'sha256', 'path')}, 'knowledge': knowledge[rva]}
+        for rva, item in current.items()})
     if assembly_only:
-        from .assembly import assembly_prompt
-        prompt = assembly_prompt(reader, state, prefix, batch)
-        if feedback:
-            prompt += (PROMPTS / 'ASSEMBLY_FEEDBACK.md').read_text(encoding='utf-8')
-    elif initial:
-        prompt, inputs = _initial_prompt(reader, state, batch, current, references)
-        # Immutable prompt source, allowing edits and interrupted publication to
-        # be replayed against exactly the code that the model saw.
-        _write(prefix.with_suffix('.input.json'), inputs)
-    elif feedback:
-        prompt, inputs = _feedback_prompt(reader, state, current, knowledge)
-        _write(prefix.with_suffix('.input.json'), inputs)
+        from .assembly import assembly_inputs
+        context = assembly_inputs(reader, prefix, batch)
     else:
-        reference_text = json.dumps(references, ensure_ascii=False)
-        modules = sorted({module_name(path.stem) for path in (reader.directory / "source/src").glob("*.c")})
-        mapping = reader.directory / 'references/ghidra/boundaries.json'
-        boundaries = [item for item in json.loads(mapping.read_text()).get('changes', [])
-                      if item.get('new_rva') in before] if mapping.exists() else []
-        prompt = render_prompt(PROMPTS / 'TARGETED.md',
-            TASK=directory / 'task.md',
-            FUNCTIONS=json.dumps(batch, ensure_ascii=False),
-            SOURCE_DIR=SOURCE_DIR,
-            DIRECTORY=reader.directory,
-            PYTHON=shlex.quote(sys.executable),
-            REFERENCES=reference_text,
-            REFERENCES_TOO_LONG=len(reference_text) > 60000,
-            OBJDUMP=shutil.which('aarch64-linux-gnu-objdump'),
-            READELF=shutil.which('aarch64-linux-gnu-readelf'),
-            RIZIN=TOOLS_DIR / 'rizin/bin/rizin',
-            MODULES=json.dumps(modules),
-            BOUNDARIES=json.dumps(boundaries, ensure_ascii=False))
-    if not initial:
-        prompt = skill_catalog(prefix, assembly_only=assembly_only, feedback=feedback) + '\n' + prompt
+        references = (read_references(reader, list(before))
+                      if state.get('ghidra', {}).get('status') == 'ready' else [])
+        context = _reference_inputs(reader, batch, current, references, knowledge)
+        if feedback:
+            reviewed = directory / 'reviewed.c'
+            for item in context:
+                if current[item['rva']]['sha256'] != state.get('expected_sha256') and reviewed.exists():
+                    item['reviewed_snapshot'] = reviewed.read_text()
+    # The exact C supplied to the model is also the immutable patch baseline.
+    _write(prefix.with_suffix('.input.json'), {
+        f"{fn['rva']:#x}": item.get('code') for fn, item in zip(batch, context)})
+    sample = reader.catalog()['sample']
+    prompt = render_prompt(PROMPTS / ('FEEDBACK.md' if feedback else 'RECOVER.md'),
+        FUNCTIONS=context, CONTEXT=json.dumps(context, ensure_ascii=False) if not assembly_only else '',
+        ASSEMBLY_ONLY=assembly_only, COMMENT=state.get('comment', ''), PARENT_TASK=state.get('parent_task'),
+        SKILL=snapshot_skill(prefix), SHA256=sample.get('sha256'), IMAGE_BASE=sample.get('base', '0'),
+        SOURCE_DIR=SOURCE_DIR, DIRECTORY=str(reader.directory), BINARY=reader.directory / 'binary/original.so',
+        PYTHON=shlex.quote(sys.executable), OBJDUMP=shutil.which('aarch64-linux-gnu-objdump'),
+        READELF=shutil.which('aarch64-linux-gnu-readelf'))
     prompt_path = prefix.with_suffix('.prompt.md')
     prompt_path.write_text(prompt, encoding="utf-8")
     if len(prompt) > MAX_PROMPT_CHARS:
@@ -286,8 +248,8 @@ def _start_batch(reader, state, number, batch):
                "--skip-git-repo-check", "--ephemeral", "-C", str(reader.directory), "--json",
                "--output-schema", str(schema), "-o", str(output)]
     if initial:
-        command.extend(['--disable', 'shell_tool', '--disable', 'plugins', '--disable', 'apps',
-                        '--disable', 'multi_agent', '-c', 'model_reasoning_effort="low"'])
+        command.extend(['--disable', 'plugins', '--disable', 'apps',
+                        '--disable', 'multi_agent', '-c', 'model_reasoning_effort="medium"'])
     elif assembly_only or feedback:
         command.extend(['--disable', 'plugins', '--disable', 'apps', '--disable', 'multi_agent'])
     profile = os.environ.get("LIGHTRE_CODEX_PROFILE")
@@ -337,6 +299,7 @@ def _feedback_knowledge(item, baseline):
 def _publish_batch(reader, state, running):
     """Save every valid item, including partial output from an unsuccessful CLI."""
     from .candidates import canonical_candidate, display_code
+    from .navigation import function_name, code_tokens
     prefix, before = running['prefix'], running['before']
     error = running.get('failure')
     limited = False
@@ -369,6 +332,8 @@ def _publish_batch(reader, state, running):
     inputs = json.loads(inputs_path.read_text()) if inputs_path.exists() else {}
     baseline_path = prefix.with_suffix('.before.json')
     baselines = json.loads(baseline_path.read_text()) if baseline_path.exists() else {}
+    changes_path = prefix.with_suffix('.changes.json')
+    changes = json.loads(changes_path.read_text()) if changes_path.exists() else {}
     for rva, item in valid:
         if rva in done:
             continue
@@ -423,14 +388,29 @@ def _publish_batch(reader, state, running):
             reply = ('分析期间源码或 Knowledge 被修改，保留当前文件；本轮源码与知识更新未发布。'
                      '\n\n模型拟议回复（未采用）：\n' + reply)
             code = None
+        old_display = (baseline or {}).get('display_code', current['display_code']) or ''
+        old_name, new_name = function_name(old_display), function_name(code) if code else None
+        changed = False
         if code:
             module = next(fn.get('module', 'recovered') for fn in running['batch'] if fn['rva'] == rva)
             if current['code'] != canonical:
                 save_candidate(reader, rva, code, module=module)
             generated += 1
+            changed = code_tokens(old_display) != code_tokens(code)
+            state['changed' if changed else 'unchanged'] = state.get('changed' if changed else 'unchanged', 0) + 1
+            if old_name and new_name and old_name != new_name:
+                renames = state.setdefault('renames', {})
+                previous = renames.get(str(rva), {})
+                renames[str(rva)] = {'old': previous.get('old', old_name), 'new': new_name}
             state['unresolved'].pop(f'{rva:#x}', None)
         else:
             state['unresolved'][f'{rva:#x}'] = reply or '本轮未确定完整逻辑，需后续分析'
+        changes[str(rva)] = {
+            'status': 'conflict' if conflict else 'unresolved' if not code else 'changed' if changed else 'unchanged',
+            'old_name': old_name, 'new_name': new_name,
+            'diff': '\n'.join(difflib.unified_diff(old_display.splitlines(),
+                        (code or old_display).splitlines(), fromfile='before.c', tofile='after.c', lineterm=''))}
+        _write(changes_path, changes)
         if state.get('mode') == 'comment':
             from .feedback import record_result
             if baseline is None and current['sha256'] == before[rva]:
@@ -671,6 +651,10 @@ def task_steps(reader, identifier=None, pool=None):
                     checkpoint()
             if active or pending:
                 yield
+        if state.get('renames'):
+            from .navigation import synchronize_calls
+            state['rename_sync'] = synchronize_calls(reader, state['renames'])
+            _write(directory / 'renames.json', state['rename_sync'])
         state['status'] = 'partial' if state['unresolved'] or state['failed_rvas'] else 'complete'
         if state.get('mode') == 'initial' and state.get('auto_refine') and not state.get('followup_id'):
             unresolved = sorted(int(rva, 0) for rva in state['unresolved'] if rva not in state['failed_rvas'])

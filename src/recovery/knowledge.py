@@ -7,7 +7,6 @@ from pathlib import Path
 from threading import RLock
 
 from markdown_it import MarkdownIt
-from lightre.prompt import render_prompt
 
 from .candidates import _atomic_write
 
@@ -120,8 +119,7 @@ def _normalize(notes):
 
 def _header(reader):
     sample = reader.catalog()['sample']
-    return render_prompt(Path(__file__).parent / 'prompts/KNOWLEDGE_HEADER.md',
-                         BINARY=Path(sample['source_path']).name, SHA256=sample['sha256'])
+    return f"# 函数知识\n\nBinary: `{Path(sample['source_path']).name}`\n\nSHA256: `{sample['sha256']}`\n\n"
 
 
 def _entry(rva, notes):

@@ -53,6 +53,7 @@ def _facts(text):
             if name and function:
                 definitions.append({
                     'name': name.text.decode(), 'start': node.start_byte, 'end': node.end_byte,
+                    'name_start': name.start_byte, 'name_end': name.end_byte,
                     'static': any(child.type == 'storage_class_specifier' and child.text == b'static'
                                   for child in node.named_children),
                     'supported': not declarator.has_error and _ancestor(node, {
@@ -179,9 +180,7 @@ def source_navigation(reader, candidate):
         return empty
     with _locked(reader):
         meta, names = _identity(reader)
-        paths = set((reader.directory / 'source/src').glob('*.c'))
-        paths.update((reader.directory / 'source').rglob('*.h'))
-        files = tuple((str(path.relative_to(reader.directory)), _read_text(path)) for path in sorted(paths))
+        files = _snapshot(reader)
         graph = _graph(files, tuple(sorted(names.items())), meta['source_path'], meta['sha256'])
         item = graph.get(candidate['rva'])
         if (item is None or item['_sha256'] != candidate['sha256']
@@ -216,3 +215,130 @@ def assembly_navigation(reader, page):
         instruction['target_rva'] = target
         instruction['reference_kind'] = 'call' if operation == 0x94000000 else 'tail_call'
     return page
+
+
+def function_name(code):
+    """Return the single supported definition name, independently of its RVA."""
+    definitions = _facts(code or '')[0]
+    return definitions[0]['name'] if len(definitions) == 1 and definitions[0]['supported'] else None
+
+
+def code_tokens(code):
+    """Compare code changes without counting formatting or comments as improvement."""
+    root = Parser(Language(tree_sitter_c.language())).parse((code or '').encode()).root_node
+    tokens, stack = [], [root]
+    while stack:
+        node = stack.pop()
+        if node.type == 'comment':
+            continue
+        if node.children:
+            stack.extend(reversed(node.children))
+        else:
+            tokens.append((node.type, node.text))
+    return tuple(tokens)
+
+
+def _snapshot(reader):
+    paths = set((reader.directory / 'source/src').glob('*.c'))
+    paths.update((reader.directory / 'source').rglob('*.h'))
+    return tuple((str(path.relative_to(reader.directory)), _read_text(path)) for path in sorted(paths))
+
+
+def source_names(reader):
+    """Expose current names without changing the native catalog or function identity."""
+    with _locked(reader):
+        files = _snapshot(reader)
+        if not files:
+            return {}
+        meta, names = _identity(reader)
+        graph = _graph(files, tuple(sorted(names.items())), meta['source_path'], meta['sha256'])
+        return {rva: item['source_name'] for rva, item in graph.items() if item['source_name']}
+
+
+def _replace_bytes(text, edits):
+    raw = text.encode()
+    for first, last, replacement in sorted(edits, reverse=True):
+        raw = raw[:first] + replacement.encode() + raw[last:]
+    return raw.decode()
+
+
+def synchronize_calls(reader, renames):
+    """Retarget provable direct calls after all model batches have been published.
+
+    Reconstruct old definition names only for binding resolution, then check
+    every proposed replacement against the actual new definitions. Unsupported
+    syntax, macros and shadowed/ambiguous symbols never receive text replacement.
+    """
+    from .candidates import _atomic_write
+    report = {'updated_calls': 0, 'skipped': [], 'scope': 'direct_calls'}
+    with _locked(reader):
+        meta, names = _identity(reader)
+        files = _snapshot(reader)
+        catalog = tuple(sorted(names.items()))
+        graph = _graph(files, catalog, meta['source_path'], meta['sha256'])
+        active = {int(rva): item for rva, item in renames.items()
+                  if int(rva) in graph and graph[int(rva)]['source_name'] == item['new']
+                  and item['old'] != item['new']}
+        virtual = []
+        for path, text in files:
+            edits = []
+            for rva, rename in active.items():
+                if graph[rva]['_path'] != path:
+                    continue
+                block = next(b for b in _blocks(text, meta) if int(b['rva'], 16) == rva)
+                start, finish = len(text[:block.body_first].encode()), len(text[:block.code_last].encode())
+                definition = next(d for d in _facts(text)[0] if start <= d['start'] < d['end'] <= finish)
+                edits.append((definition['name_start'], definition['name_end'], rename['old']))
+            virtual.append((path, _replace_bytes(text, edits)))
+        previous = _graph(tuple(virtual), catalog, meta['source_path'], meta['sha256'])
+        edits_by_path, expected = defaultdict(list), []
+        for rva, item in previous.items():
+            # Definition-name lengths may differ in the virtual snapshot. Call
+            # ordinals are stable, whereas absolute token offsets are not.
+            old_calls = sorted(item['references'] + item['unresolved_references'], key=lambda ref: ref['start'])
+            actual = graph[rva]
+            actual_calls = sorted(actual['references'] + actual['unresolved_references'], key=lambda ref: ref['start'])
+            if len(old_calls) != len(actual_calls):
+                continue
+            path = actual['_path']
+            text = dict(files)[path]
+            block = next(b for b in _blocks(text, meta) if int(b['rva'], 16) == rva)
+            display = _strip_producer(block.body)
+            display_start = len(text[:block.code_last].encode()) - len(display.encode())
+            utf16 = display.encode('utf-16-le')
+            for ordinal, (old, current) in enumerate(zip(old_calls, actual_calls)):
+                target = old.get('target_rva')
+                rename = active.get(target)
+                if not rename or old['name'] != rename['old'] or current['name'] != rename['old']:
+                    continue
+                # An already resolved current binding belongs to another entity.
+                if current.get('target_rva') not in (None, target):
+                    report['skipped'].append({'rva': rva, 'name': current['name'], 'reason': 'binding_changed'})
+                    continue
+                first = display_start + len(utf16[:current['start'] * 2].decode('utf-16-le').encode())
+                last = display_start + len(utf16[:current['end'] * 2].decode('utf-16-le').encode())
+                edits_by_path[path].append((first, last, rename['new']))
+                expected.append((rva, ordinal, target, rename['new']))
+        proposed = tuple((path, _replace_bytes(text, edits_by_path[path])) for path, text in files)
+        checked = _graph(proposed, catalog, meta['source_path'], meta['sha256'])
+        for rva, ordinal, target, name in expected:
+            item = checked[rva]
+            calls = sorted(item['references'] + item['unresolved_references'], key=lambda ref: ref['start'])
+            if ordinal >= len(calls) or calls[ordinal].get('target_rva') != target or calls[ordinal]['name'] != name:
+                report['skipped'].append({'rva': rva, 'name': name, 'reason': 'new_binding_not_unique'})
+        if report['skipped']:
+            # Keep this synchronization transaction unchanged if any replacement
+            # would bind to a shadow, macro, static helper or another function.
+            report['reason'] = 'binding_check_failed'
+            return report
+        for path, text in proposed:
+            original = dict(files)[path]
+            if text != original:
+                _atomic_write(reader.directory / path, text)
+        report['updated_calls'] = len(expected)
+        # Report unresolved old direct calls, rather than claiming full rename.
+        for rva, item in previous.items():
+            for ref in item['unresolved_references']:
+                if any(ref['name'] == rename['old'] for rename in active.values()):
+                    report['skipped'].append({'rva': rva, 'name': ref['name'], 'reason': ref['reason']})
+    return report

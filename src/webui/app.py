@@ -12,7 +12,7 @@ from recovery import read_candidate, read_knowledge
 from recovery.jobs import progress, start_task, stop_task, task_state
 from recovery.queue import ACTIVE, cancel, clear_finished, ensure_worker, resume as resume_queue, snapshot
 from recovery.feedback import history as feedback_history
-from recovery.navigation import SourceChanged, source_navigation, assembly_navigation
+from recovery.navigation import SourceChanged, source_navigation, assembly_navigation, source_names
 
 
 class Feedback(BaseModel):
@@ -42,7 +42,14 @@ def create_app(reader, *, start_worker=True, status=None):
 
     @app.get("/api/functions")
     def functions():
-        return reader.catalog()
+        result = reader.catalog()
+        try:
+            current_names = source_names(reader)
+        except (OSError, ValueError) as error:
+            raise HTTPException(409, str(error)) from error
+        for function in result['functions']:
+            function['source_name'] = current_names.get(function['rva'])
+        return result
 
     @app.get("/api/functions/{rva}/candidate")
     def candidate(rva: str):
@@ -87,6 +94,22 @@ def create_app(reader, *, start_worker=True, status=None):
         try:
             return stop_task(reader)
         except (RuntimeError, OSError) as error:
+            raise HTTPException(409, str(error)) from error
+
+    @app.post('/api/functions/{rva}/recover')
+    def reanalyze(rva: str):
+        try:
+            address = int(rva, 0)
+        except ValueError as error:
+            raise HTTPException(400, '无效 RVA') from error
+        try:
+            read_candidate(reader, address)
+            # Explicit selection uses targeted mode, including existing LLM
+            # candidates; ordinary resume still skips completed functions.
+            return start_task(reader, [address])
+        except KeyError as error:
+            raise HTTPException(404, str(error)) from error
+        except (RuntimeError, ValueError, OSError) as error:
             raise HTTPException(409, str(error)) from error
 
     @app.post('/api/tasks/clear')

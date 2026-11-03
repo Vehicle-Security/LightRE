@@ -2,17 +2,8 @@
 
 import json
 import re
-import shutil
-import shlex
-import sys
-from pathlib import Path
 
-from lightre.prompt import render_prompt
-from lightre.paths import SOURCE_DIR
 from .knowledge import read_knowledge
-
-
-PROMPTS = Path(__file__).parent / 'prompts'
 
 
 def _inline_instruction(op, image_base):
@@ -25,11 +16,11 @@ def _inline_instruction(op, image_base):
     return f"{op['rva']:x} {opcode}"
 
 
-def assembly_prompt(reader, state, prefix, batch):
+def assembly_inputs(reader, prefix, batch):
     sample = reader.catalog()['sample']
     image_base = sample.get('base', 0)
     image_base = int(image_base, 0) if isinstance(image_base, str) else image_base
-    inputs, sections = [], []
+    inputs = []
     for fn in batch:
         rva = fn['rva']
         with reader._connect() as conn:
@@ -37,9 +28,8 @@ def assembly_prompt(reader, state, prefix, batch):
         path = prefix.parent / f'{prefix.name}-{rva:#010x}.asm'
         count, offset, instructions = 0, 0, []
         with path.open('w', encoding='utf-8') as stream:
-            stream.write(render_prompt(PROMPTS / 'ASSEMBLY_HEADER.md', RVA=hex(rva),
-                                       SHA256=sample.get('sha256'), IMAGE_BASE=sample.get('base', '0'),
-                                       RANGES=json.dumps(ranges)))
+            stream.write('# ' + json.dumps({'rva': hex(rva), 'sha256': sample.get('sha256'),
+                                            'image_base': image_base, 'ranges': ranges}) + '\n')
             while True:
                 page = reader.assembly(rva, offset=offset, limit=200)
                 for op in page['instructions']:
@@ -56,21 +46,7 @@ def assembly_prompt(reader, state, prefix, batch):
         knowledge = path.with_suffix('.knowledge.md')
         knowledge_text = read_knowledge(reader, rva)
         knowledge.write_text(knowledge_text, encoding='utf-8')
-        inputs.append({**fn, 'assembly': str(path), 'instructions': count,
-                       'ranges': ranges, 'knowledge': str(knowledge)})
-        sections.append(render_prompt(PROMPTS / 'ASSEMBLY_SECTION.md', RVA=hex(rva),
-                                      KNOWLEDGE=knowledge_text, COUNT=count,
-                                      INSTRUCTIONS='\n'.join(instructions)).rstrip('\n'))
-    return render_prompt(PROMPTS / 'ASSEMBLY.md',
-        TASK=prefix.parent / 'task.md',
-        SHA256=sample.get('sha256'),
-        BINARY=reader.directory / 'binary/original.so',
-        IMAGE_BASE=f'{image_base:#x}',
-        SOURCE_DIR=SOURCE_DIR,
-        OBJDUMP=shutil.which('aarch64-linux-gnu-objdump'),
-        READELF=shutil.which('aarch64-linux-gnu-readelf'),
-        INPUTS=json.dumps(inputs, ensure_ascii=False),
-        COMMENT=state.get('comment'),
-        PYTHON=shlex.quote(sys.executable),
-        DIRECTORY=f'{str(reader.directory)!r}',
-        SECTIONS=chr(10).join(sections))
+        inputs.append({'rva': hex(rva), 'instructions': count, 'knowledge': knowledge_text,
+                       'assembly_text': '\n'.join(instructions),
+                       'snapshot': {'assembly': str(path), 'ranges': ranges, 'knowledge': str(knowledge)}})
+    return inputs

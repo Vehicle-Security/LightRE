@@ -145,7 +145,7 @@ uv build --wheel
 - [当前功能与 API](docs/USAGE.md)
 - [总体架构](docs/design/ARCHITECTURE.md)
 - [Agent 架构说明](docs/design/AGENTS_ARCHITECTURE_EXPLAINED.md)
-- [Rehost workflow](docs/design/REHOST_WORKFLOW.md)
+- [Rehost 设计](docs/design/REHOST_DESIGN.md)
 - [Recovery 与任务循环](docs/design/GOAL_LOOP.md)
 - [需求清单](docs/REQUIREMENTS.md)
 - [长期路线图](docs/ROADMAP.md)

@@ -48,21 +48,26 @@ class PromptTests(unittest.TestCase):
         self.assertIn('输入目录：/inputs/{{TASK}}', result)
         self.assertIn('- 主库.so\n- 依赖/{{UNKNOWN}}.so', result)
 
-    def test_recovery_defaults_and_large_reference_branch_live_in_templates(self):
+    def test_recovery_templates_keep_code_and_assembly_inputs_separate(self):
         prompts = Path(recovery.__file__).parent / 'prompts'
-        task = render_prompt(prompts / 'TASK.md', DIRECTORY='/analysis', RVAS='0x4',
-                             INPUT_MODE='reference', COMMENT='', EXPECTED_SHA256=None)
-        self.assertIn('完成全部指定函数的一轮还原。', task)
-        self.assertIn('提交建议时的候选 SHA256：尚无候选', task)
-        context = dict(TASK='/task.md', FUNCTIONS='[]', SOURCE_DIR='/tool', DIRECTORY='/analysis',
-                       PYTHON='python', REFERENCES='full reference', OBJDUMP=None, READELF=None,
-                       RIZIN='/rizin', MODULES='[]', BOUNDARIES='[]')
-        large = render_prompt(prompts / 'TARGETED.md', **context, REFERENCES_TOO_LONG=True)
-        self.assertIn('read_references(reader, 本批RVA列表)', large)
-        self.assertNotIn('full reference', large)
-        small = render_prompt(prompts / 'TARGETED.md', **context, REFERENCES_TOO_LONG=False)
-        self.assertIn('full reference', small)
-        self.assertNotIn('参考伪代码过长', small)
+        code = 'int test(void) { return {{TASK}}; }'
+        context = dict(FUNCTIONS=[{'rva': '0x4', 'instructions': 1, 'assembly_text': '4 ret',
+                                   'snapshot': {'ranges': [[4, 8]]}, 'knowledge': '已有线索'}],
+                       CONTEXT=code, COMMENT='修改返回值', PARENT_TASK=None,
+                       SKILL={'name': 'test', 'description': 'test', 'path': '/skill.md'},
+                       SOURCE_DIR='/tool', DIRECTORY='/analysis/{{TASK}}', BINARY='/original.so',
+                       SHA256='a' * 64, IMAGE_BASE='0', PYTHON='python', OBJDUMP=None, READELF=None)
+        for name in ('RECOVER.md', 'FEEDBACK.md'):
+            with self.subTest(template=name):
+                reference = render_prompt(prompts / name, **context, ASSEMBLY_ONLY=False)
+                self.assertIn(code, reference)
+                self.assertNotIn('```asm', reference)
+                assembly = render_prompt(prompts / name, **context, ASSEMBLY_ONLY=True)
+                self.assertIn('```asm\n4 ret\n```', assembly)
+                self.assertIn('已有线索', assembly)
+                self.assertNotIn(code, assembly)
+                self.assertIn('/analysis/{{TASK}}', assembly)
+                self.assertIn('edits=null', assembly)
 
     def test_guide_updates_preserve_custom_text_and_replace_only_verification(self):
         with tempfile.TemporaryDirectory() as directory:

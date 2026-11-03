@@ -10,9 +10,9 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from rehost.loop import repair
+from rehost.workflow import run_rounds as repair
 from rehost.guide import ensure
-from rehost.process import execute
+from rehost.storage import execute
 from rehost.runner import run, check
 from rehost.contract import configure
 from lightre.workspace import PROJECT_DIR

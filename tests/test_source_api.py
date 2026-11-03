@@ -72,6 +72,112 @@ class SourceApiTests(unittest.TestCase):
             return (conn.execute('SELECT * FROM functions ORDER BY rva').fetchall(),
                     conn.execute('SELECT * FROM assembly ORDER BY function_rva,ordinal').fetchall())
 
+    def test_semantic_names_are_visible_without_changing_native_identity(self):
+        save_candidate(self.reader, 4, 'unsigned sum_bytes(void) { return 0; }')
+        functions = self.client.get('/api/functions').json()['functions']
+        self.assertEqual(functions[0]['source_name'], 'sum_bytes')
+        self.assertEqual(functions[0]['name'], 'same_native_name')
+        self.assertEqual(functions[0]['rva'], 4)
+
+    def test_reanalyze_existing_llm_candidate_uses_current_prompt_and_publishes_new_name(self):
+        save_candidate(self.reader, 4, 'int fcn_00000004(void) { return 7; }')
+        original = self.source(4)
+        with patch('recovery.queue._ensure_worker'), patch('recovery.queue.shutil.which', return_value='/fake/codex'):
+            response = self.client.post('/api/functions/0x4/recover')
+        self.assertEqual(response.status_code, 200, response.text)
+        job = response.json()
+        self.assertEqual(job['mode'], 'targeted')
+        self.assertEqual(job['rvas'], [4])
+        self.assertEqual(self.source(4)['sha256'], original['sha256'])
+        case = self
+
+        class FakeCodex:
+            returncode = 0
+            def __init__(process, command, **kwargs):
+                prompt = kwargs['stdin'].read().decode()
+                case.assertIn('主动重命名', prompt)
+                case.assertIn('int fcn_00000004', prompt)
+                case.assertNotIn('来源身份用 fcn_', prompt)
+                process.output = Path(command[command.index('-o') + 1])
+            def poll(process):
+                process.output.write_text(json.dumps({'results': [{
+                    'rva': '0x4', 'code': 'int read_constant(void) { return 7; }',
+                    'edits': None, 'notes': '返回常量 7，依据返回值命名，未经执行验证。'}]}))
+                return 0
+
+        with patch('recovery.jobs.prepare_references', return_value={'status': 'unavailable'}), \
+             patch('recovery.jobs.subprocess.Popen', FakeCodex), \
+             patch('recovery.jobs.format_code', side_effect=lambda reader, code: code), \
+             patch('recovery.jobs.signal.signal'):
+            run_task(self.reader, job['id'])
+        current = self.source(4)
+        self.assertEqual(current['source_name'], 'read_constant')
+        self.assertEqual(self.identity(current), self.identity(original))
+        self.assertEqual(self.client.get('/api/functions').json()['functions'][0]['source_name'], 'read_constant')
+        self.assertIsNone(self.source(8)['code'])
+        self.assertEqual(self.client.post('/api/functions/no-rva/recover').status_code, 400)
+        self.assertEqual(self.client.post('/api/functions/0xff/recover').status_code, 404)
+
+    def test_model_rename_synchronizes_bound_calls_and_preserves_strings_and_shadows(self):
+        from recovery.navigation import synchronize_calls
+        save_candidate(self.reader, 4, 'int add_offset(int input) { return input + 7; }', module='callee')
+        save_candidate(self.reader, 8, 'int caller(void) { const char *name = "FUN_00000004"; '
+                       'int result = FUN_00000004(2); '
+                       '{ int (*FUN_00000004)(int) = 0; result += FUN_00000004(3); } '
+                       'return result; }', module='caller')
+        old_id = self.identity(self.source(8))
+        report = synchronize_calls(self.reader, {'4': {'old': 'FUN_00000004', 'new': 'add_offset'}})
+        self.assertEqual(report['updated_calls'], 1)
+        caller = self.source(8)
+        self.assertIn('add_offset(2)', caller['display_code'])
+        self.assertIn('"FUN_00000004"', caller['display_code'])
+        self.assertIn('FUN_00000004(3)', caller['display_code'])
+        self.assertEqual([ref['target_rva'] for ref in caller['references']], [4])
+        self.assertEqual(self.identity(caller), old_id)
+        self.assertEqual(synchronize_calls(self.reader, {'4': {'old': 'FUN_00000004', 'new': 'add_offset'}})['updated_calls'], 0)
+
+    def test_task_finishes_by_synchronizing_calls_after_parallel_outputs(self):
+        save_candidate(self.reader, 4, 'int FUN_00000004(int param_1) { return param_1 + 7; }')
+        save_candidate(self.reader, 8, 'int caller(void) { return FUN_00000004(2); }')
+        with patch('recovery.queue._ensure_worker'), patch('recovery.queue.shutil.which', return_value='/fake/codex'):
+            task = submit(self.reader, [4, 8])
+
+        class FakeCodex:
+            returncode = 0
+            def __init__(process, command, **kwargs):
+                schema = json.loads(Path(command[command.index('--output-schema') + 1]).read_text())
+                process.rvas = schema['properties']['results']['items']['properties']['rva']['enum']
+                process.output = Path(command[command.index('-o') + 1])
+            def poll(process):
+                process.output.write_text(json.dumps({'results': [
+                    {'rva': rva, 'code': 'int add_offset(int input) { return input + 7; }' if rva == '0x4'
+                     else 'int caller(void) { return FUN_00000004(2); }', 'notes': '按机器角色命名，未经执行验证。'}
+                    for rva in process.rvas]}))
+                return 0
+
+        with patch('recovery.jobs.prepare_references', return_value={'status': 'unavailable'}), \
+             patch('recovery.jobs.subprocess.Popen', FakeCodex), \
+             patch('recovery.jobs.format_code', side_effect=lambda reader, code: code), \
+             patch('recovery.jobs.signal.signal'):
+            run_task(self.reader, task['id'])
+        state = json.loads((Path(task['directory']) / 'state.json').read_text())
+        self.assertEqual(state['status'], 'complete')
+        self.assertEqual(state['changed'], 1)
+        self.assertEqual(state['unchanged'], 1)
+        self.assertEqual(state['rename_sync']['updated_calls'], 1)
+        self.assertIn('add_offset(2)', self.source(8)['display_code'])
+        self.assertTrue((Path(task['directory']) / 'renames.json').is_file())
+
+    def test_model_rename_does_not_capture_shadowed_new_name(self):
+        from recovery.navigation import synchronize_calls
+        save_candidate(self.reader, 4, 'int add_offset(int input) { return input + 7; }')
+        save_candidate(self.reader, 8, 'int caller(void) { int (*add_offset)(int) = 0; return FUN_00000004(2); }')
+        before = self.source(8)
+        report = synchronize_calls(self.reader, {'4': {'old': 'FUN_00000004', 'new': 'add_offset'}})
+        self.assertEqual(report['updated_calls'], 0)
+        self.assertEqual(report['reason'], 'binding_check_failed')
+        self.assertEqual(self.source(8)['sha256'], before['sha256'])
+
     def test_web_continue_delivers_inline_assembly_and_publishes_to_source_routes(self):
         with patch('recovery.queue._ensure_worker'), \
              patch('recovery.queue.shutil.which', return_value='/unused/codex'):

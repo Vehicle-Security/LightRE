@@ -13,8 +13,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
-from lightre.prompt import render_prompt
-
 from .candidates import candidate_rvas, read_candidate
 
 ACTIVE = ("queued", "running")
@@ -173,15 +171,6 @@ def submit(reader, rvas=None, comment='', expected_sha256=None, workers=None, pa
         identifier = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S') + '-' + uuid4().hex[:8]
         directory = root / identifier
         directory.mkdir()
-        task = directory / 'task.md'
-        prompts = Path(__file__).parent / 'prompts'
-        task.write_text(render_prompt(prompts / 'TASK.md', DIRECTORY=reader.directory,
-                                      RVAS=', '.join(f'{rva:#x}' for rva in sorted(selected)),
-                                      INPUT_MODE=input_mode, COMMENT=comment,
-                                      EXPECTED_SHA256=expected_sha256), encoding='utf-8')
-        if parent_task:
-            with task.open('a', encoding='utf-8') as stream:
-                stream.write(render_prompt(prompts / 'FOLLOWUP.md', PARENT_TASK=parent_task))
         try:
             if candidate is not None:
                 if candidate['code']:
@@ -192,7 +181,7 @@ def submit(reader, rvas=None, comment='', expected_sha256=None, workers=None, pa
                      'workers': workers, 'active_batches': 0, 'rvas': sorted(selected),
                      'directory': str(directory), 'mode': mode, 'comment': comment,
                      'expected_sha256': expected_sha256, 'codex': executable, 'input_mode': input_mode}
-            # V0.2 produces one conservative Ghidra + LLM pass. Existing jobs
+            # One recovery pass; existing jobs
             # with auto_refine=true still retain their recorded continuation.
             state['auto_refine'] = False
             if parent_task:
