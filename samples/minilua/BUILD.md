@@ -7,7 +7,7 @@
 现成目标：`large/deliverable/minilua`。直接交给 Agent：
 
 ```text
-读取 /work2/LightRE/SKILL.md，分析 /work2/LightRE/samples/minilua/large/deliverable/minilua，workspace 使用 /work2/minilua-analysis，然后打开结果供我查看。
+读取 /work2/LightRE/docs/USAGE.md，分析 /work2/LightRE/samples/minilua/large/deliverable/minilua，workspace 使用 /work2/minilua-analysis，然后打开结果供我查看。
 ```
 
 |测试目的|文件|luaV_execute RVA|指令数|
@@ -102,7 +102,7 @@ cd deliverable
 小函数测试对象是 `deliverable/minilua`。在对话中发送下面这段即可按项目入口分析并打开页面：
 
 ```text
-读取 /work2/LightRE/SKILL.md，分析 /work2/LightRE/samples/minilua/deliverable/minilua，workspace 使用 /work2/minilua-analysis，然后打开结果供我查看。
+读取 /work2/LightRE/docs/USAGE.md，分析 /work2/LightRE/samples/minilua/deliverable/minilua，workspace 使用 /work2/minilua-analysis，然后打开结果供我查看。
 ```
 
 已有样本可直接使用。只有缺少文件或需要修改样本时才重新构建。传具体 ELF 文件路径；LightRE 的目录选择逻辑寻找 `.so`，不要只传 `deliverable/`。

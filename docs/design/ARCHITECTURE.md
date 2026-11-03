@@ -1,165 +1,85 @@
 # LightRE 总体架构
 
-本文维护模块职责、数据归属与扩展边界。当前命令和 API 统一见 [功能说明](../USAGE.md)，需求及人工验收口径见 [需求清单](../REQUIREMENTS.md)，后续顺序见 [路线图](../ROADMAP.md)。标为“规划”的能力不代表已经实现。
+本文以当前代码为准说明模块职责、数据归属和运行边界。当前命令和 API 见 [USAGE](../USAGE.md)；未实现的差分和 VM 恢复方案见 [future](../future/README.md)。
 
-产品定位：LightRE 是在容器中持续运行的逆向分析服务，由系统集成和管理多个 Codex CLI 实例。用户通过系统内的指导会话提出目标、了解进度并调整任务，后台工作实例独立推进分析与验证。项目面向自己的服务和界面开发；Skill/workflow 是内部指令资源，外部 Codex 加载项目 Skill 属于旧入口兼容方式。
-
-## 当前实现与规划
-
-| 层次 | 已实现 | 仍属规划 |
-| --- | --- | --- |
-| 静态分析 | Ghidra 函数/汇编/伪代码导出，持久 SQLite | 更完整的调用与全局状态模型 |
-| 候选恢复 | 一轮 LLM、完整汇编输入、模块源码、函数知识、评论队列 | 候选工程构建、去混淆与业务语义闭环 |
-| 动态执行 | ARM64 Android SO 的 Maven/Java harness、独立检查器、Run 快照、重放与 harness 修复 | 原实现/候选双边差分、检查点对齐、fuzz/强制探索自动化 |
-| 数据与导航 | 每 SO 独立身份、文件正文、一对一来源标记及派生源码索引 | 多对多来源、统一发布 revision、持久 Evidence 索引、独立源码工程导出 |
-| 自动化 | 静态候选队列、harness 最小修复循环 | 完整工程 Goal Loop、自动记忆提炼与跨版本知识积累 |
-| 服务与交互 | 源码浏览 Web、评论任务及可单独使用的 Agent 管理 | 常驻 Python 服务、指导聊天窗口、统一后台编排与事件展示 |
-
-V0.2 已通过用户人工验收；V0.31 仍待验收。DG/minilua 原始运行已实测，不表示 DG 巨函数已恢复 C 或任何候选已通过差分。
-
-## 主要入口与模块
-
-目标主入口为常驻 Python 服务，提供聊天与任务 API，并协调后台工作实例。当前仍通过专用 CLI/Web 和兼容的 [SKILL.md](../../SKILL.md) 启动已有功能，主服务与聊天窗口尚待实施。调用时明确目标及外部 workspace；只浏览已有结果不创建分析任务，静态恢复和动态运行分别显式启动。
-
-| 入口/模块 | 职责 |
-| --- | --- |
-| scripts/analyze.py、src/analyzers/ | 导入所选 ELF、执行或复用 Ghidra 导出、初始化源码并提交候选任务 |
-| src/recovery/ | 候选与知识读写、模块整理、评论发布、持久队列和模型批次 |
-| scripts/web.py、src/webui/ | 浏览保存的数据、提交评论、显示任务；浏览不现场调用 Ghidra |
-| scripts/harness.py、src/execution/ | 关联工程、构建、执行、校验、记录、重放及 harness 修复 |
-| scripts/rehost.py、src/rehost/ | 以代码和 Markdown workflow 调查未知 SO，从空目标工程生成 harness，按真实失败动态补环境 |
-| scripts/agent.py、src/agents/ | 通用 Agent 会话、持久消息、单轮执行及跨进程查询；业务主循环按 ID 使用 |
-| examples/ | 已知样本的适配依据、历史说明、独立检查器及固定测试 SO 准备脚本 |
-| samples/minilua/ | minilua 原源码、Linux 构建、Android 薄接口及构建脚本 |
-
-静态队列和 harness 任务共用所选 SO 写锁，harness 另有工程锁；静态调度器不会把 harness 任务当作候选批次。模型 CLI 是外部进程，退出码、最终正文、工程修改和实际检查分别记录。
-
-## 常驻服务与指导会话（待实现）
-
-main.py 启动服务及 Python 主循环，持续接收聊天、任务和控制请求，协调调度、进度与恢复。空闲时等待请求或任务事件，不反复调用模型。主服务持续运行，工作进程按需启动和退出；逻辑会话可有多个，实际活跃 Codex CLI 数量受配置的并发额度和项目写锁约束。先复用现有 Web/API、SQLite 和子进程能力，不引入独立消息中间件或通用 Agent 平台。
-
-指导会话使用一个稳定的 Codex CLI 会话，为用户解释项目、调查结果和下一步，并通过系统的任务/控制接口提交工作、查询进度或调整执行。后台按任务创建工作会话，持有自己的输入、输出和状态；聊天与工作会话分别登记 session/run 引用，工作日志不会自动混成用户对话。指导会话繁忙、失败或窗口关闭不阻塞已提交任务，关闭聊天连接也不等于取消任务。停止、暂停和恢复以明确的任务控制为准。
-
-聊天窗口通过 LightRE API 提交消息、接收执行事件与完整回复，重连后从持久会话和游标继续。当前 agents 的 exec/resume 能提供持久多轮会话，运行中消息仍按 next_turn 排队；首次接入应如实展示该语义，不能把排队消息说成已实时送达。指导会话对任务控制的实际调用也要登记请求及任务 ID，自然语言中的“完成”不能修改业务完成状态。
-
-| 层次 | 整理后的职责 |
-| --- | --- |
-| Python 常驻服务与主循环 | 聊天/任务 API、后台编排、目标与检查点、并发额度、失败反馈、停止与恢复；消费确定性检查结论 |
-| 指导会话 | 面向用户的持久 Codex 会话；理解目标、说明进度，通过系统接口组织工作 |
-| agents | 指导及工作会话共用的模型执行层，管理 SQLite 队列、会话恢复、事件/正文、取消、超时和进程归属 |
-| 内部 prompt / workflow | 指导模型调查、改代码和使用工具，约定范围及交接；按现有资源复用 |
-| recovery | 静态恢复批次及评论策略、模型输入与输出业务协议、候选/知识发布；调用统一 agents 能力 |
-| execution | Maven/Java/unidbg 的构建与执行、独立核验、运行记录、快照及重放 |
-| rehost / analyzers | 前者准备新目标工程和调查材料，后者提供静态分析能力；流程由任务入口组织 |
-
-内部指令的 Markdown 由服务读取并随任务传入模型，或在允许读取工具的轮次明确要求模型读取固定资源；禁用读取工具的静态首轮必须内嵌所需内容。每轮记录实际指令及所用资源内容依据，避免恢复时悄然使用不同规则。项目根 SKILL.md 只保留旧调用方式兼容，不作为服务器启动前置，也不递归加载其启动说明；具体执行复用功能内的 prompt/workflow，不复制第二套操作指令。
-
-主服务重启时先核对 SQLite、任务检查点、实际产物与进程租约，恢复会话关联及任务管理；已有写入者仍在运行时不重复启动。运行状态丢失的任务保留 interrupted 等真实状态，不自动重放可能修改文件的模型请求。V0.31 先接通指导窗口和 harness/rehost 编排，静态恢复保持一轮策略；完整候选构建及差分循环按 V0.3 后续计划实施。
-
-当前 recovery/jobs.py、execution/loop.py 和 agents/codex.py 存在重复的 Codex 命令与启动逻辑，整理后只由 agents 负责模型执行。execution 的原生工具运行与模型执行有不同协议，两者共用必要的进程生命周期小函数，模型事件和会话仍由 agents 解释。静态批次队列与 agent 会话 FIFO 管理不同层次的顺序，各自只保留本层状态；主循环不另建第三套消息队列。具体实施及验证见 [V0.31 维护计划](../milestones/v0.31/PLAN.md#维护与优化计划)。
-
-## 通用 Agent 管理层
-
-通用管理层由 `AgentManager`、`AgentSession`、`AgentRun` 和 `CodexExec` 组成。Python 与 CLI 客户端共用显式管理根目录，通过 SQLite 登记会话、FIFO 消息与执行状态，通过文件保存原始 prompt、JSONL 事件、stderr、最终正文与执行元数据。底层不识别 RVA、源码、Knowledge、JNI、检查器或目标名称。API 和命令统一见 [通用 Agent 管理](../USAGE.md#通用-agent-管理)。
-
-本地 session ID 是稳定的管理身份，run ID 是一条消息的一次执行；Codex thread_id 单独登记，只用作持久会话续聊。句柄仅保存 root 与 ID，可以在另一个 Python 或 CLI 进程重建。同 session 串行，不同 session 可并行；每个功能模块保存自己的会话/运行引用并提供业务检查，主循环根据实际结果决定后续工作，不由底层接管 Goal Loop。
-
-每个 session 至多一个后台 owner；提交和退出交接使用数据库事务及文件租约，避免退出瞬间遗漏新消息。CLI 继承 owner 租约，worker 意外退出且 CLI 仍运行时不会再启动一个写入者。正常结束、取消和超时统一处理进程组后才发布终态；丢失完成记录时标 interrupted，保留输出并暂停后续消息。请求键支持去重，失败的写入任务不会自动重放。当前底层 owner 处理完队列即退出；目标产品的 LightRE 主服务则保持常驻，进程生命周期与会话 owner 分开管理。
-
-当前后端执行 `codex exec`；执行中的消息持久排队，在下一轮投递。实时 steering 显式报告不支持，保留后端替换空间。默认持久 session 续聊，也可选择每轮独立的 ephemeral 模式。管理层只判断单轮执行协议是否完成，不宣称模型语义、构建或业务目标通过。功能模块负责共享项目互斥、自己的并发额度及独立验证。
-
-该基础层已可单独使用；静态候选、harness 修复和 rehost 的现有调用尚未迁移，原有业务状态、锁和发布行为保持原协议。接入时复用此层，分别保留各模块主循环及外部检查，不把已有业务任务无依据地映射为新的管理会话。
-
-2026-11-02 用户确认继续使用 SQLite。agents 的会话、消息顺序、请求去重及可变执行状态以数据库为准；prompt、原始回复、事件和日志以文件保留。业务任务引用 session/run ID，业务验证结论由各模块维护，不重复修改同一个 agent 状态。现有静态队列与 harness 的 JSON 格式在 V0.31 维护整理中保持兼容，任务状态统一迁移另行设计。
-
-## 内部目录、启动与资源
-
-用户明确 LightRE 只作为容器内工具使用，内部模块保持 src/agents、src/analyzers、src/recovery、src/execution、src/rehost、src/webui 等职责目录，无需统一搬入 src/lightre 或提供外部包调用。维护目标是仓库命令可直接启动，后台沿用同一解释器和内部导入规则，资源相对实际代码位置解析；具体步骤见 [V0.31 维护与优化计划](../milestones/v0.31/PLAN.md#维护与优化计划)。
-
-当前工作树仍有 pyproject.toml、uv.lock、lightre.cli 和转发脚本的安装实现，以及按安装位置读取资源的代码。这是待按上述目标收敛的现状，不作为必须先安装 LightRE 才能运行的产品约束；依赖与开发工具配置可继续由 pyproject 统一维护，兼容 requirements 清单如保留应自动导出。现有入口在完成实现整理和验证后再同步功能说明，不把计划当作当前启动方式。
-
-Web 文件、Ghidra Java 脚本、prompts、workflow 和 clang-format 风格由相应模块负责，避免为资源定位额外引入包装层或依赖调用 cwd。系统工具安装仍归 scripts/install_deps.sh；依赖准备不改变用户输入与 workspace 的路径语义。整理不改变任务 ID、SO/RVA 身份或历史记录，保留必要的兼容与迁移。
-
-## 工作区与数据
-
-Workspace 是用户指定或由服务项目配置明确的外部分析根目录。聊天和任务绑定明确的 workspace/目标，服务端相对路径以该请求明确的项目基准解析，不使用工作实例的临时 cwd 推断。当前 CLI/兼容 Skill 仍按固定调用目录解析并转为绝对路径。工具仓库和样本 Git 仓库不承载分析结果；为已有目标增加动态执行时复用原 workspace。
-
-每份 SO 使用 `<名称>-<短SHA>/` 保存独立的 index.sqlite、原始副本、源码、知识、任务与 Run。完整 SHA256 是身份依据，在本 workspace 内复用相同内容；短码仅服务目录可读性，冲突时延长新目录的前缀，不覆盖旧结果。不同 SO 的同一 RVA、源码 ID 或运行结论不合并，不新增跨 SO 数据库或冗余 binary_id。
+## 运行链路
 
 ```text
-<外部workspace>/
-  harnesses/<目标>/
-    HARNESS.md                    # 可编辑工程操作说明，修复前读取并更新计划
-    pom.xml
-    src/main/java/
-  <名称>-<短SHA>/
-    index.sqlite                  # 当前 SO 的身份、静态分析及派生源码索引
-    binary/original.so
-    references/ghidra/            # 静态导出、日志及 Ghidra 项目
-    source/src/                   # 唯一当前源码正文
-    knowledge.md                  # 当前知识，按函数 RVA 二级标题组织
-    harness.json                  # 工程、入口、用例、检查器和产物关联
-    harness-cases.json            # 用例也可按显式路径单独保存
-    tasks/<id>/                   # 静态批次或 harness 修复任务
-    runs/<id>/                    # 当次输入、源码/检查器快照、日志与产物
+lightre <SO 或已有 workspace>
+      │
+      ├─ lightre.server
+      │    ├─ 依赖检查
+      │    ├─ prepare_analysis（导入 SO、自动静态导出或复用结果）
+      │    ├─ WorkspaceReader（只读）
+      │    ├─ main_workflow
+      │    └─ Uvicorn / FastAPI
+      │
+      ├─ recovery
+      │    ├─ 函数候选、Knowledge 和源码
+      │    └─ 静态批次队列
+      │
+      └─ rehost
+           ├─ 空 harness、契约和静态检查
+           ├─ Java/Maven/unidbg Run
+           └─ Codex 修复循环
 ```
 
-来源目录中 .bin、.lua、APK 或依赖 SO 的用途需调查。导入不递归复制全部资源；运行实际使用的输入保存快照，SO 和 Maven 依赖按路径及哈希绑定。共享资源可引用同一文件，不能从目录名推断它是已确认的 VM 结构。
+根目录 `lightre` 是 POSIX shell 引导器，在 Ubuntu 24.04 基础容器中先用 apt 安装下载工具和证书，再安装 uv，并由 uv 准备 Python 与项目依赖。服务层继续准备原生工具、匹配 Ghidra 要求的 JDK 和独立 Codex CLI；无需调用者预装这些工具。
 
-| 内容 | 权威位置与实现状态 |
+服务启动时接收 SO 路径、含一个 SO 的外部 workspace，或已有 SO 分析目录。`main_workflow.prepare_analysis()` 为 SO 自动创建仓库外的 workspace（也可由 `--workspace` 指定），导入目标并在需要时调用 `analyzers.ghidra.analyze()` 完成静态导出；已有完整结果直接复用，未完成的导出从原始 SO 重试。得到只读 `WorkspaceReader` 后再启动后续任务与 HTTP 服务。
+
+## 模块边界
+
+| 模块 | 当前职责 |
 | --- | --- |
-| SO 完整哈希、显示名称、来源、格式版本 | 当前 SO 的 SQLite 元数据 |
-| 函数、范围、汇编 | 当前 SO 的 SQLite；来自同次静态导出 |
-| 当前代码正文、名称、ID、来源注释 | source/src 文件；SQLite 只保存可重建索引 |
-| 当前知识与未知项 | knowledge.md，不复制到 SQLite |
-| 评论、提交时快照、状态、原始模型输出 | tasks 文件，不建立第二份任务数据库 |
-| 当前共享 Java harness | workspace/harnesses/<目标> |
-| 工程关联与固定检查规则 | harness.json、用例 JSON 和独立检查器 |
-| 当次运行与实际依据 | runs 中的 manifest、源码、输入、契约/检查器快照和日志 |
-| 持久 Evidence 索引、源码版本选择、exports | 规划，不能把当前文件系统记录等同于这些 API 已存在 |
+| `src/lightre/` | 服务入口、REST API、workspace 读取、依赖准备和顶层 workflow |
+| `src/agents/` | Codex session/run、SQLite 状态、后台 worker、事件和最终回复 |
+| `src/analyzers/` | Ghidra Headless 导出函数、范围、汇编和参考伪代码 |
+| `src/recovery/` | 候选 C、源码模块、Knowledge、评论队列和批量恢复 |
+| `src/rehost/` | harness 指令、契约、Maven/Java 执行、Run 快照、重放和修复循环 |
+| `src/webui/` | 函数目录、汇编、候选、Knowledge 和评论页面 |
+| `samples/minilua/` | 样本源码、Android 薄接口和样本自己的构建/测试脚本 |
 
-备份先停止写入，复制 workspace 及其引用的固定资源；Run 不复制整个 Maven 缓存，也不保证迁移后离线可执行。数据库含 SO 身份及静态分析，不可整体当作随意删除的缓存。
+原来的根目录脚本、多命令 CLI、`src/lightre/cli/` 和 `src/execution/` 已删除，不是当前架构的一部分。
 
-## 身份、源码与索引
+## Agent 层
 
-原始函数身份使用其入口 RVA；RVA 不等于运行时 VA 或文件偏移。当前源码的稳定 ID 和 origins 注释以所属 SO 为范围，名称、文件和显示行号可变化，不能重新分配身份。SQLite 不保存第二份源码正文。
+`AgentManager` 只负责模型执行生命周期，不理解 RVA、SO、JNI、harness 或验证语义：
 
-当前每段源码对应一个原始 RVA，一对一 source_index 从文件标记派生；模块内容变化会重建映射。受支持的 C 调用和 ARM64 直接调用可点击跳转。函数合并/拆分、多对多索引、无原始来源 helper 和统一 revision 发布仍待实现。具体协议及失败时保留旧结果的约束见 [源码导航](SOURCE_NAVIGATION.md)。
+- `AgentSession` 表示一个可持久化 Codex 会话，消息按提交顺序排队。
+- `AgentRun` 表示一条消息的执行，可用 `poll()`、`iter_states()` 和 `wait()` 观察。
+- SQLite 保存 session/run 状态、租约、取消请求和 Codex thread ID。
+- prompt、事件 JSONL、stderr、最终正文和执行记录保存在 session/run 目录。
+- 不同 session 可以并行；同一个 session 同时只允许一个 worker。
 
-当前候选允许保留 Ghidra 类型、goto、混淆控制流和未知依赖，不保证模块组合后可编译。后续构建需要固定实际源码输入，不能把 binary/original.so 冒充候选产物；构建 Run 与双边执行协议见 [动态差分](DIFFERENTIAL_EXECUTION.md)。
+Recovery 目前仍有自己的批次调度和 Codex 调用协议；Rehost 已通过 `agents.run_blocking()` 接入，但两者的统一迁移尚未完成。
 
-## Agent 生成与共享 unidbg harness
+## Workspace 和数据归属
 
-2026-11-02 按用户修正，产品以 [rehost workflow](../USAGE.md#rehost-从零生成) 从零生成目标 harness，不维护预制的 DG/minilua Java 模板。每次 start 创建独立工程，仅提供公共 Maven 配置与 HARNESS.md；Agent 调查入口、ABI、初始化与依赖，并据真实 unidbg 失败逐项补环境。resume 继续同一生成工程。旧外部工程及 Run 保留为历史证据，不作为新目标的启动模板。
+每个 SO 使用独立的外部目录：
 
-未知目标可先固定输入、收集原实现运行观察；没有独立预期时报告 observed、passed=false，不宣称固定行为检查通过。有固定用例/检查器时沿用外部核验。下述共享约定只用于已生成工程经过兼容性核对后的显式复用，不作为每次新目标生成的默认起点。
+```text
+<workspace>/<name>-<sha>/
+  index.sqlite                  # 元数据、函数目录和汇编索引
+  binary/original.so            # 不可变原始目标
+  references/ghidra/            # Ghidra 项目、导出和日志
+  source/src/                   # 当前源码正文
+  knowledge.md                  # 当前逆向知识
+  harness.json                  # 动态 harness 关联
+  tasks/<id>/                   # 静态任务或 harness 修复任务
+  runs/<id>/                    # 构建、执行、观察和验证证据
+```
 
-通用执行器仅负责 Maven/Java 调用、进程管理、输入保存、结果比较及完整性检查，不识别 DG、minilua 或 smoke，不包含目标 ABI、RVA、JNI、预期公式或产物名分支。
+SQLite 是函数和汇编目录的权威来源；源码文件是候选正文的权威来源；Knowledge、任务和 Run 保留在各自的文件记录中。原始 SO、固定用例、检查器和历史 Run 不由模型覆盖。
 
-harness.json 显式指定工程、Java main_class、固定用例、可选的独立检查器和产物列表。Java 负责目标加载、初始化、参数、状态和输出提取；Python 检查器负责独立预期与目标专用校验。检查器和用例必须位于模型可编辑工程之外，并随执行进入 Run 快照。完整字段和调用协议只在 [功能说明](../USAGE.md#harness-配置与运行) 维护。
+## Rehost 运行边界
 
-每个工程先生成 HARNESS.md，适配或修复前读取并更新计划；说明和源码一起保存执行前快照。外部执行器在结束后更新当前说明的证据区，模型不能预写通过。历史说明不补写，重放不使用当前可编辑源码或当前检查器。
+Rehost 只支持 Android ARM64 SO + Java/Maven/unidbg。`Contract` 保存固定输入、预期、检查器和产物声明；`runner` 为每次执行建立完整快照；`process` 记录命令、日志、超时和进程组清理；`loop` 在外部验证失败后安排下一轮 Agent。
 
-共享工程表示代码兼容，不表示不同版本的 RVA、JNI 假设或验证结论相同。每个 SO 使用自己的输入、参数、契约和 Run；未知 ABI、初始化、对象布局和环境必须调查，不能把任意 RVA 当作独立函数自动调用，也不能用通用返回零的 stub 消除缺口。
+没有独立预期时只保存 `observed` 结果。观察、构建成功、检查器通过和语义等价是不同状态，不能混用。
 
-纯 native 目标不需要 Dalvik/JNI；DG 示例实际观察 JNI_OnLoad 与实例生命周期，minilua 示例走薄 C 接口。样本细节由 [DG 说明](../../examples/dg/ADAPTATION.md)、[minilua 说明](../../examples/minilua/ADAPTATION.md) 和源码项目负责。保持单一依赖安装入口，不预建目标注册库、多后端平台或完整 Android 环境模型。
+## 服务和 UI
 
-## 证据、知识与可恢复 Context
+`lightre.api` 提供健康、workspace、workflow 和 Recovery 状态接口；`webui` 提供源码浏览和评论接口。主 workflow 当前写入 `main-workflow.json`，并启动 Recovery 与 Rehost；差分反馈和用户指导聊天尚未接通。
 
-Evidence 表达有条件的工具观察，Knowledge 表达当前理解与假设，Context 是当前任务选择读取的资料。三者不是三个服务。当前已有知识 Markdown、静态资料、任务与 Run；结构化 Evidence 登记和完整 Context 检索接口仍是规划。
-
-长期 Evidence 最少包含 id、run_id、kind、summary、data、artifact_ref、status，区分静态、自然执行、symbolic、forced 和 differential。大量 trace 保留文件，用路径/行号/偏移定位，不把每条指令写进 SQLite。失败实验也保留原始输入、条件和缺口；执行失败不能被解释为目标逻辑不存在或路径不可达。
-
-Unknown 放在知识的未解决项中，不另建数据库或服务。有效记录包括问题、状态、已尝试方法、Run/证据引用、缺失条件及下一步；解决后补充依据并保留失败路线。知识编辑整合事实、假设、冲突与未知，不能累积逐轮回复日志。现有读写和迁移 API 见 [功能说明](../USAGE.md#内部-api-与函数知识)。
-
-跨版本公共知识是后续按需提炼的 workspace Markdown，注明来源 SO、适用条件及反例；不能直接复制其他版本的地址、opcode 或通过结论。原始观察留在各 SO，公共总结不替代新版本验证，不增加公共 SQLite 或自动继承机制。
-
-未来 Context 按目标/RVA 返回当前代码、知识、相关静态资料、运行和失败记录；调查时再读取具体部分。自动记忆归纳、依赖传播和语义检索不作为当前最小修复循环的前提。完整返回保存和交接协议只在 [Goal Loop](GOAL_LOOP.md) 维护。
-
-## 自动化与 Web
-
-已实现的静态队列负责一轮候选生成与评论续做，协议见 [任务队列](TASK_QUEUE.md)。评论优先取得并发名额，同一 RVA 串行发布；当前评论不会自动执行 unidbg、构建或差分。源码与知识必须按实际输入做冲突校验，不能让旧回复覆盖新内容。
-
-harness 修复循环使用目标固定用例，原样保存每轮返回，再由外层实际构建/运行后决定停止或续跑。完整工程恢复还需要候选构建、反例驱动语义修复及独立源码交付，见 [Goal Loop](GOAL_LOOP.md) 和 [路线图](../ROADMAP.md)。
-
-现有 Web 提供结果浏览和评论；目标界面还提供指导聊天与任务控制，后台工作由常驻服务持续管理。任务提交后不依赖窗口连接或人工逐轮确认，聊天与工作执行分别管理。VM/OLLVM/MBA 的方法和阶段检查集中在 [VM 恢复](VM_RECOVERY.md)，不在架构文档重复维护。
+主服务重启后的任务恢复、Rehost 重复启动保护和 Recovery/Agent 状态统一仍属于后续整理工作，不应由文档提前宣称已经完成。

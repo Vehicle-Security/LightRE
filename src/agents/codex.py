@@ -1,4 +1,13 @@
-"""The Codex exec transport. No recovery, validation loop or task policy."""
+"""Codex CLI 命令构造和进程工具。
+
+本模块提供：
+1. CodexExec - 构造 Codex CLI 命令
+2. process_identity() - 获取进程身份（用于验证进程存活）
+3. read_events() - 读取 Codex 输出的 events.jsonl
+4. stop_group() - 停止进程组
+
+这些是底层工具，通常不直接使用，而是被 manager.py 和 worker.py 调用。
+"""
 
 import json
 import os
@@ -91,13 +100,13 @@ class CodexExec:
             command += ['--output-schema', str(self.directory / 'schema.json')]
         return command + ['-']
 
-    def start(self, lease_fd):
+    def start(self, lease_fd, *, pass_fds=()):
         with (self.directory / 'prompt.md').open('rb') as prompt, \
                 (self.directory / 'events.jsonl').open('wb') as events, \
                 (self.directory / 'stderr.log').open('wb') as errors:
             return subprocess.Popen(self.command(), cwd=self.session['cwd'], stdin=prompt,
                                     stdout=events, stderr=errors, start_new_session=True,
-                                    pass_fds=(lease_fd,))
+                                    pass_fds=(lease_fd, *pass_fds))
 
     def check_result(self, exit_code, thread_id, turn_completed):
         try:

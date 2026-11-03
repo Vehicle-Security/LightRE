@@ -428,34 +428,33 @@ Agent 选定函数和问题
 
 ### 安装依赖
 
-项目中的 `scripts/install_deps.sh` 面向 Ubuntu 24.04 容器，会：
+LightRE 的 `lightre.deps` 面向 Ubuntu 24.04 容器，会：
 
 - 安装 Java 21、Python、curl、unzip 等基础依赖；
 - 检查现有 Rizin；如果没有则从源码构建；
 - 从 Ghidra 官方 GitHub Release 下载最新公开发行版；
 - 将工具安装到项目的 `tools/` 目录；
-- 配合 `set_env.sh` 使用，后者只导出项目根目录变量 `PRJ_DIR`。
+- 由 `lightre` 和 `paths.py` 自动解析工具目录，不依赖 shell 环境注入。
 
 执行：
 
 ```bash
 cd LightRE
-./scripts/install_deps.sh
-source ./set_env.sh
+lightre <workspace>
 
-"$PRJ_DIR/tools/rizin/bin/rizin" -v
-"$PRJ_DIR/tools/ghidra/support/analyzeHeadless"
+"$LIGHTRE_TOOLS_DIR/rizin/bin/rizin" -v
+"$LIGHTRE_TOOLS_DIR/ghidra/support/analyzeHeadless"
 ```
 
-`set_env.sh` 会自动调用 `scripts/install_deps.sh` 统一检查 Rizin、Ghidra Headless、Java 21 及其他依赖。所有依赖都存在时安装器会快速返回；只有缺少依赖时才会安装系统包、构建 Rizin 或下载 Ghidra。`set_env.sh` 只导出 `PRJ_DIR`，其值就是项目根目录。
+`lightre.deps` 是系统依赖的统一安装模块；LightRE 运行时通过 `LIGHTRE_TOOLS_DIR`、`GHIDRA_HOME` 和 PATH 解析工具，不需要 source 环境脚本。
 
-缺少依赖时脚本需要联网，并可能需要 `sudo` 安装 Ubuntu 系统依赖。工具安装在项目的 `tools/`，可通过环境变量覆盖 Ghidra 下载地址：
+缺少依赖时服务需要联网，并可能需要 `sudo` 安装 Ubuntu 系统依赖。工具安装在配置的 tools 目录，可通过环境变量覆盖 Ghidra 下载地址：
 
 ```bash
-GHIDRA_URL=https://example.org/ghidra.zip ./scripts/install_deps.sh
+GHIDRA_URL=https://example.org/ghidra.zip lightre <workspace>
 ```
 
-脚本支持重复执行：已经存在且可用的 Rizin 或 Ghidra 会被复用，不会重复下载。
+服务支持重复启动：已经存在且可用的 Rizin 或 Ghidra 会被复用，不会重复下载。
 
 ## 11. 常见问题
 

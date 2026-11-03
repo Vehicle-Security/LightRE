@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 from uuid import uuid4
 
-from workspace import RESULT_SCHEMA, WorkspaceReader, prepare_workspace
+from lightre.workspace import RESULT_SCHEMA, WorkspaceReader, prepare_workspace
 from lightre.paths import TOOLS_DIR
 
 SCRIPT = Path(__file__).with_name('ghidra_scripts') / 'ExportReferences.java'
@@ -34,7 +34,7 @@ def find_headless():
 def _configuration(digest):
     executable = find_headless()
     if not executable:
-        raise RuntimeError('找不到 Ghidra Headless，请运行 scripts/install_deps.sh')
+        raise RuntimeError('找不到 Ghidra Headless，请在部署环境中安装运行时依赖')
     properties = Path(executable).resolve().parents[1] / 'Ghidra/application.properties'
     version = properties.read_text(encoding='utf-8') if properties.exists() else executable
     analysis_timeout = os.environ.get('LIGHTRE_GHIDRA_ANALYSIS_TIMEOUT', '300')
@@ -59,7 +59,7 @@ def _read_export(path, digest):
     return data
 
 
-def _export(directory, digest, configuration, force=False):
+def _export(directory, digest, configuration, force=False, *, pass_fds=()):
     executable, identity, analysis_timeout, function_timeout = configuration
     root = directory / 'references/ghidra'
     root.mkdir(parents=True, exist_ok=True)
@@ -88,7 +88,8 @@ def _export(directory, digest, configuration, force=False):
     process = None
     try:
         with (root / 'headless.log').open('ab') as log:
-            process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True)
+            process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=log, stderr=log,
+                                       start_new_session=True, pass_fds=pass_fds)
             returncode = process.wait()
             process = None
         if returncode or not output.exists() or not assembly.exists():
@@ -163,7 +164,7 @@ def _publish(conn, data, assembly_path, identity):
 
 def analyze(target, workspace=None, name=None, force=False):
     """Export Ghidra results, reconcile old boundaries, and seed module drafts."""
-    from .migration import publish_catalog, recover_catalog
+    from .catalog import publish_catalog, recover_catalog
     from recovery.source import prepare_source
     directory = prepare_workspace(Path(target), workspace, name)
     original = directory / 'binary/original.so'
@@ -183,8 +184,12 @@ def analyze(target, workspace=None, name=None, force=False):
         with sqlite3.connect(directory / 'index.sqlite') as conn:
             meta = dict(conn.execute('SELECT key,value FROM metadata'))
         configuration = _configuration(meta['sha256'])
-        data, output, assembly, state = _export(directory, meta['sha256'], configuration, force)
-        if (force or meta.get('analysis_profile') != ANALYSIS_PROFILE
+        # A headless export may outlive a service restart; keep its writer locks in the child.
+        data, output, assembly, state = _export(
+            directory, meta['sha256'], configuration, force,
+            pass_fds=(analysis_lock.fileno(), worker_lock.fileno()))
+        if (force or meta.get('schema_version') != RESULT_SCHEMA or meta.get('state') != 'ready'
+                or meta.get('analysis_profile') != ANALYSIS_PROFILE
                 or meta.get('ghidra_export_identity') != state['identity']):
             publish_catalog(directory, data, assembly, state['identity'])
         if output.name.endswith('.pending.json'):
@@ -201,7 +206,7 @@ def prepare_references(reader):
     root = reader.directory / 'references/ghidra'
     state_path = root / 'state.json'
     if not state_path.exists():
-        return {'status': 'unavailable', 'error': '尚未导出 Ghidra 参考，请运行 scripts/analyze.py'}
+        return {'status': 'unavailable', 'error': '尚未导出 Ghidra 参考，请由主 workflow 完成静态分析'}
     state = json.loads(state_path.read_text())
     if state.get('status') != 'ready':
         return {'status': 'unavailable', 'error': 'Ghidra 导出尚未完成，请重新运行分析入口'}

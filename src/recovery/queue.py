@@ -13,6 +13,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
+from lightre.prompt import render_prompt
+
 from .candidates import candidate_rvas, read_candidate
 
 ACTIVE = ("queued", "running")
@@ -172,19 +174,14 @@ def submit(reader, rvas=None, comment='', expected_sha256=None, workers=None, pa
         directory = root / identifier
         directory.mkdir()
         task = directory / 'task.md'
-        task.write_text('# LightRE 函数还原任务\n\n'
-                        f'SO 结果目录：{reader.directory}\n\n函数 RVA：'
-                        + ', '.join(f'{rva:#x}' for rva in sorted(selected))
-                        + f'\n\n输入模式：{input_mode}（assembly 仅使用汇编与原 ELF，不读取 Ghidra 伪代码）。'
-                        + '\n\n## 用户意见\n\n' + (comment or '完成全部指定函数的一轮还原。')
-                        + f'\n\n提交建议时的候选 SHA256：{expected_sha256 or "尚无候选"}\n'
-                        + '\n执行时读取最新候选。若与提交时不同，结合 reviewed.c 理解评论，不回滚新结果。\n',
-                        encoding='utf-8')
+        prompts = Path(__file__).parent / 'prompts'
+        task.write_text(render_prompt(prompts / 'TASK.md', DIRECTORY=reader.directory,
+                                      RVAS=', '.join(f'{rva:#x}' for rva in sorted(selected)),
+                                      INPUT_MODE=input_mode, COMMENT=comment,
+                                      EXPECTED_SHA256=expected_sha256), encoding='utf-8')
         if parent_task:
             with task.open('a', encoding='utf-8') as stream:
-                stream.write(f'\n## 自动续做\n\n首轮任务 {parent_task} 未能给出这些函数的完整候选。'
-                             '读取已保存的未解决原因，按需核对完整汇编与本地工具结果，补全有依据的代码。'
-                             '不能用空函数、跳过副作用或照抄已知截断的初稿冒充还原；材料仍不足则记录具体缺口。\n')
+                stream.write(render_prompt(prompts / 'FOLLOWUP.md', PARENT_TASK=parent_task))
         try:
             if candidate is not None:
                 if candidate['code']:
@@ -235,11 +232,11 @@ def pause(reader):
             _signal(reader, running)
 
 
-def resume(reader):
+def resume(reader, *, retry_errors=False):
     with locked(reader) as root:
         (root / '.paused').unlink(missing_ok=True)
         for job in snapshot(reader):
-            if job['status'] == 'interrupted':
+            if job['status'] == 'interrupted' or (retry_errors and job['status'] == 'error'):
                 job.update(status='queued', current=[], active_batches=0)
                 _legacy_progress(reader, job)
                 write_state(Path(job['directory']) / 'state.json', job)

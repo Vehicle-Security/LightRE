@@ -3,7 +3,7 @@
 import os
 import sys
 
-from workspace import WorkspaceReader
+from lightre.workspace import WorkspaceReader
 from .queue import run_queue
 
 

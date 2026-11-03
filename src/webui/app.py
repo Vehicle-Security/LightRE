@@ -20,10 +20,11 @@ class Feedback(BaseModel):
     comment: str = Field(min_length=1, max_length=20000)
 
 
-def create_app(reader):
+def create_app(reader, *, start_worker=True, status=None):
     app = FastAPI(title="LightRE")
     app.mount('/static', StaticFiles(directory=Path(__file__).with_name('static')), name='static')
-    ensure_worker(reader)
+    if start_worker:
+        ensure_worker(reader)
 
     @app.middleware("http")
     async def fresh_responses(request, call_next):
@@ -34,6 +35,10 @@ def create_app(reader):
     @app.get("/", include_in_schema=False)
     def page():
         return FileResponse(Path(__file__).with_name("index.html"))
+
+    @app.get('/api/status')
+    def analysis_status():
+        return status() if status else {'ready': True, 'status': 'ready', 'phase': 'ready'}
 
     @app.get("/api/functions")
     def functions():

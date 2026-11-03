@@ -14,7 +14,7 @@ from recovery import merge_sources, read_candidate, save_candidate, read_knowled
 from recovery.candidates import GHIDRA_MARKER, candidate_rvas, migrate_candidates
 from recovery.jobs import BusyError, _batches, progress, run_task, start_task, task_state
 from recovery.source import prepare_source
-from workspace import RESULT_SCHEMA, WorkspaceReader
+from lightre.workspace import RESULT_SCHEMA, WorkspaceReader
 
 
 class CandidateTests(unittest.TestCase):

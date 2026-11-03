@@ -1,4 +1,31 @@
-"""One detached owner drains one session. Other processes only submit/query IDs."""
+"""后台 Worker 进程 - 执行异步任务。
+
+本模块是一个独立的后台进程，通过 `python -m agents.worker` 启动。
+
+## 工作原理
+
+1. AgentManager 在需要时自动启动 worker 进程
+2. Worker 监听 session 的任务队列（SQLite）
+3. 当有 queued runs 时，worker 取出并执行
+4. 执行完成后更新状态为 completed
+
+## 何时使用
+
+- run_async() → 自动启动 worker
+- session.send_message() → 自动启动 worker
+- run_blocking() → 不使用 worker（前台执行）
+
+## 不需要手动调用
+
+manager.py 会自动管理 worker 的启动和监控。
+
+## 命令行
+
+```bash
+# 通常不需要手动运行，但如果需要：
+python -m agents.worker --root /path/to/agents --session <session_id> --lease-fd <fd>
+```
+"""
 
 import argparse
 import json
@@ -10,7 +37,7 @@ from .codex import CodexExec, process_identity, read_events, stop_group
 from .manager import AgentManager, _json
 
 
-def _execute(manager, session, row, lease_fd, stopped):
+def _execute(manager, session, row, lease_fd, stopped, pass_fds=()):
     request = json.loads(row['request'])
     directory = manager._run_directory(session['id'], row['id'])
     transport = CodexExec(session, request, directory)
@@ -53,7 +80,7 @@ def _execute(manager, session, row, lease_fd, stopped):
         if cancelled or stopped():
             status, error = 'cancelled' if cancelled else 'interrupted', 'Execution stopped before launch'
         else:
-            process = transport.start(lease_fd)
+            process = transport.start(lease_fd, pass_fds=pass_fds)
             execution.update(pid=process.pid, process_identity=process_identity(process.pid), status='running')
             with manager._db() as db:
                 db.execute('UPDATE runs SET cli_pid=?,cli_identity=? WHERE id=?',
@@ -98,7 +125,7 @@ def _execute(manager, session, row, lease_fd, stopped):
             db.execute('UPDATE sessions SET paused=1,pause_reason=? WHERE id=?', (error, session['id']))
 
 
-def serve(manager, session_id, lease_fd):
+def serve(manager, session_id, lease_fd, pass_fds=()):
     stopped = False
 
     def stop(signum, frame):
@@ -124,7 +151,7 @@ def serve(manager, session_id, lease_fd):
                     lease_fd = None
                     return
                 db.execute("UPDATE runs SET status='running',started_at=? WHERE id=?", (time.time(), row['id']))
-            _execute(manager, session, row, lease_fd, lambda: stopped)
+            _execute(manager, session, row, lease_fd, lambda: stopped, pass_fds=pass_fds)
     except BaseException as error:
         with manager._db() as db:
             db.execute('BEGIN IMMEDIATE')
@@ -143,8 +170,9 @@ def main():
     parser.add_argument('--root', required=True)
     parser.add_argument('--session', required=True)
     parser.add_argument('--lease-fd', type=int, required=True)
+    parser.add_argument('--pass-fd', type=int, action='append', default=[])
     args = parser.parse_args()
-    serve(AgentManager(args.root), args.session, args.lease_fd)
+    serve(AgentManager(args.root), args.session, args.lease_fd, pass_fds=args.pass_fd)
 
 
 if __name__ == '__main__':

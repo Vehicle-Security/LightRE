@@ -16,7 +16,7 @@ from recovery import save_candidate, save_knowledge
 from recovery.jobs import run_task
 from recovery.queue import run_queue, submit, write_state
 from webui.app import create_app
-from workspace import RESULT_SCHEMA, WorkspaceReader
+from lightre.workspace import RESULT_SCHEMA, WorkspaceReader
 
 
 class SourceApiTests(unittest.TestCase):

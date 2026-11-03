@@ -10,14 +10,14 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from execution.loop import repair
-from execution.guide import ensure
-from execution.process import execute
-from execution.runner import run, check
-from execution.contract import configure
-from workspace import PROJECT_DIR
-DG_NATIVE_SIGNATURES = runpy.run_path(str(PROJECT_DIR / "examples/dg/checker.py"))["DG_NATIVE_SIGNATURES"]
-from execution.storage import digest, exclusive, read_json, write_json
+from rehost.loop import repair
+from rehost.guide import ensure
+from rehost.process import execute
+from rehost.runner import run, check
+from rehost.contract import configure
+from lightre.workspace import PROJECT_DIR
+DG_NATIVE_SIGNATURES = runpy.run_path(str(PROJECT_DIR / "tests/fixtures/execution/dg_checker.py"))["DG_NATIVE_SIGNATURES"]
+from rehost.storage import digest, exclusive, read_json, write_json
 from recovery.queue import snapshot
 
 
@@ -39,9 +39,9 @@ class ExecutionTests(unittest.TestCase):
         self.java.write_text('FIXED')
         write_json(self.so / 'harness.json', {
             'path': str(self.harness), 'parameters': {'main_class': 'lightre.NativeHarness'},
-            'cases': str(PROJECT_DIR / 'examples/native-smoke/cases.json'),
-            'checker': str(PROJECT_DIR / 'examples/native-smoke/checker.py'), 'artifacts': []})
-        ensure(self.harness, 'native-smoke', instructions=PROJECT_DIR / 'examples/native-smoke/ADAPTATION.md')
+            'cases': str(PROJECT_DIR / 'tests/fixtures/execution/native_smoke_cases.json'),
+            'checker': str(PROJECT_DIR / 'tests/fixtures/execution/native_smoke_checker.py'), 'artifacts': []})
+        ensure(self.harness, 'native-smoke', instructions=PROJECT_DIR / 'tests/fixtures/execution/adaptations/native_smoke.md')
         self.bin = self.root / 'bin'
         self.bin.mkdir()
         self.jar = self.root / 'dependency.jar'
@@ -120,7 +120,7 @@ print('{"type":"turn.completed"}')
 
     def test_guide_profiles_preserve_adaptations_and_do_not_claim_target_support(self):
         for kind in ('native-smoke', 'dg', 'minilua'):
-            guide = ensure(self.root/kind, kind, instructions=PROJECT_DIR / f'examples/{kind}/ADAPTATION.md')
+            guide = ensure(self.root/kind, kind, instructions=PROJECT_DIR / f'tests/fixtures/execution/adaptations/{kind.replace("native-smoke", "native_smoke")}.md')
             text = guide.read_text()
             self.assertIn('尚未检查', text)
             if kind == 'dg':
@@ -170,7 +170,7 @@ print('{"type":"turn.completed"}')
         script.write_bytes(b'real source fixture')
         request = {'input_file': str(script), 'chunk_name': 'tests/case.lua'}
         write_json(self.so/'harness.json', {'path': str(self.harness), 'cases': 'harness-cases.json',
-                                           'checker': str(PROJECT_DIR / 'examples/minilua/checker.py'),
+                                           'checker': str(PROJECT_DIR / 'tests/fixtures/execution/minilua_checker.py'),
                                            'artifacts': ['proto.txt'],
                                            'parameters': {'main_class': 'lightre.MiniluaHarness'}})
         write_json(self.so/'harness-cases.json', [
@@ -233,7 +233,7 @@ if '-version' not in sys.argv:
                    'runtime_j': 0, 'runtime_h': '', 'runtime_m': '', 'runtime_k': '',
                    'random_seed': 0, 'monotonic_nanos': 1000000000, 'wall_time_millis': 1700000000000}
         write_json(self.so/'harness.json', {'path': str(self.harness), 'cases': 'harness-cases.json',
-            'checker': str(PROJECT_DIR / 'examples/dg/checker.py'), 'artifacts': ['output.bin'],
+            'checker': str(PROJECT_DIR / 'tests/fixtures/execution/dg_checker.py'), 'artifacts': ['output.bin'],
             'parameters': {'main_class': 'lightre.DgHarness'}})
         write_json(self.so/'harness-cases.json', [
             {'id': 'dg', 'input_sha256': digest(seed), 'request': request,
@@ -360,7 +360,7 @@ if '-version' not in sys.argv:
     def test_saved_checker_is_pinned_and_current_checker_is_not_used_for_replay(self):
         self.minilua_contract()
         checker = self.root / 'fixed-checker.py'
-        checker.write_bytes((PROJECT_DIR/'examples/minilua/checker.py').read_bytes())
+        checker.write_bytes((PROJECT_DIR/'tests/fixtures/execution/minilua_checker.py').read_bytes())
         config = read_json(self.so/'harness.json')
         write_json(self.so/'harness.json', {**config, 'checker': str(checker)})
         first = run(self.so)
@@ -378,7 +378,7 @@ if '-version' not in sys.argv:
     def test_checker_and_cases_cannot_be_edited_as_part_of_harness(self):
         self.minilua_contract()
         checker = self.harness/'checker.py'
-        checker.write_bytes((PROJECT_DIR/'examples/minilua/checker.py').read_bytes())
+        checker.write_bytes((PROJECT_DIR/'tests/fixtures/execution/minilua_checker.py').read_bytes())
         config = read_json(self.so/'harness.json')
         write_json(self.so/'harness.json', {**config, 'checker': str(checker)})
         self.assertIn('outside the editable harness', run(self.so)['error'])

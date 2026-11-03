@@ -3,7 +3,7 @@
 现在优先使用大函数版 `large/deliverable/minilua`，用于测试真实解释器经过强控制流混淆后的分析复杂度：
 
 ```text
-读取 /work2/LightRE/SKILL.md，分析 /work2/LightRE/samples/minilua/large/deliverable/minilua，workspace 使用 /work2/minilua-analysis，然后打开结果供我查看。
+读取 /work2/LightRE/docs/USAGE.md，分析 /work2/LightRE/samples/minilua/large/deliverable/minilua，workspace 使用 /work2/minilua-analysis，然后打开结果供我查看。
 ```
 
 在页面按 RVA 搜索 **`0x4d58`（luaV_execute，40,589 条指令、162,356 字节）**。这是单个函数的真实机器指令数，基线为 1,099 条；按每页 200 条读取需要 203 页。LightRE 若只识别到部分指令，应与保存的完整参考比较，不能把识别结果当作函数实际大小。

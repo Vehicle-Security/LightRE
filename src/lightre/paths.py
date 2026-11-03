@@ -11,9 +11,9 @@ _candidate = SOURCE_DIR.parent
 REPOSITORY_DIR = _candidate if SOURCE_DIR.name == 'src' and (_candidate / 'pyproject.toml').is_file() else None
 # Compatibility for existing workspace guards and repository-only examples.
 PROJECT_DIR = REPOSITORY_DIR or PACKAGE_DIR
-_data = Path(os.environ.get('XDG_DATA_HOME', Path.home() / '.local/share'))
-TOOLS_DIR = Path(os.environ.get('LIGHTRE_TOOLS_DIR',
-                               REPOSITORY_DIR / 'tools' if REPOSITORY_DIR else _data / 'lightre/tools')).expanduser().resolve()
+_default_tools = (REPOSITORY_DIR / 'tools'
+                  if REPOSITORY_DIR else Path.home() / '.local/lightre/tools')
+TOOLS_DIR = Path(os.environ.get('LIGHTRE_TOOLS_DIR', _default_tools)).expanduser().resolve()
 CLANG_FORMAT = PACKAGE_DIR / 'resources/clang-format'
 
 

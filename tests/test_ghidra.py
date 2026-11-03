@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 from analyzers.ghidra import analyze, investigate_function
 from recovery import read_candidate, save_candidate, read_knowledge, save_knowledge
-from workspace import WorkspaceReader
+from lightre.workspace import WorkspaceReader
 
 
 class GhidraTests(unittest.TestCase):

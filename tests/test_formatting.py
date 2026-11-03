@@ -17,7 +17,7 @@ from recovery.formatting import FormattingError, format_code
 from recovery.jobs import _publish_batch
 from recovery.markers import regions
 from recovery.source import prepare_source
-from workspace import RESULT_SCHEMA, WorkspaceReader
+from lightre.workspace import RESULT_SCHEMA, WorkspaceReader
 
 
 class FormattingTests(unittest.TestCase):

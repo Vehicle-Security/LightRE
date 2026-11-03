@@ -1,0 +1,62 @@
+#!/bin/sh
+set -eu
+
+ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)"
+UV_BIN="${LIGHTRE_UV_BIN:-}"
+USER_BIN="${XDG_BIN_HOME:-${HOME:-}/.local/bin}"
+
+if [ -z "$UV_BIN" ] || [ ! -x "$UV_BIN" ]; then
+  if [ -x "$ROOT_DIR/.venv/bin/uv" ]; then
+    UV_BIN="$ROOT_DIR/.venv/bin/uv"
+  elif [ -x "$ROOT_DIR/tools/venv/bin/uv" ]; then
+    UV_BIN="$ROOT_DIR/tools/venv/bin/uv"
+  elif command -v uv >/dev/null 2>&1; then
+    UV_BIN="$(command -v uv)"
+  else
+    if [ -x "$USER_BIN/uv" ]; then
+      UV_BIN="$USER_BIN/uv"
+    else
+      if [ "${LIGHTRE_AUTO_INSTALL_DEPS:-1}" = 0 ]; then
+        printf '%s\n' 'LightRE: 缺少 uv，自动安装已禁用。' >&2
+        exit 1
+      fi
+      if ! command -v curl >/dev/null 2>&1 || [ ! -s /etc/ssl/certs/ca-certificates.crt ]; then
+        command -v apt-get >/dev/null 2>&1 || {
+          printf '%s\n' 'LightRE: 从空环境启动需要 Ubuntu/Debian 的 apt-get。' >&2
+          exit 1
+        }
+        printf '%s\n' 'LightRE: 正在安装下载工具和 CA 证书。' >&2
+        if [ "$(id -u)" = 0 ]; then
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates curl tar gzip
+        elif command -v sudo >/dev/null 2>&1; then
+          sudo -n apt-get update
+          sudo -n env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates curl tar gzip
+        else
+          printf '%s\n' 'LightRE: 自动安装系统依赖需要 root 或免交互 sudo。' >&2
+          exit 1
+        fi
+      fi
+      printf '%s\n' 'LightRE: uv 未找到，正在安装到用户目录。' >&2
+      INSTALLER="$(mktemp)"
+      trap 'rm -f "$INSTALLER"' EXIT HUP INT TERM
+      curl -LsSf --retry 3 https://astral.sh/uv/install.sh -o "$INSTALLER"
+      UV_INSTALL_DIR="$USER_BIN" UV_NO_MODIFY_PATH=1 sh "$INSTALLER"
+      rm -f "$INSTALLER"
+      trap - EXIT HUP INT TERM
+      [ -x "$USER_BIN/uv" ] || {
+        printf '%s\n' "LightRE: uv 安装完成但未找到 $USER_BIN/uv。" >&2
+        exit 1
+      }
+      UV_BIN="$USER_BIN/uv"
+    fi
+  fi
+fi
+
+# uv downloads Python itself; the container does not need a system interpreter.
+if [ "${LIGHTRE_AUTO_INSTALL_DEPS:-1}" = 0 ]; then
+  export UV_PYTHON_DOWNLOADS=never
+fi
+PATH="$USER_BIN:$PATH"
+export PATH
+exec "$UV_BIN" run --project "$ROOT_DIR" --locked --python 3.12 lightre "$@"

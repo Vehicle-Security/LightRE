@@ -8,9 +8,10 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from execution.runner import run
-from execution.storage import digest, read_json, write_json
+from rehost.runner import run
+from rehost.storage import digest, read_json, write_json
 from rehost import start, resume
+from rehost.workflow import continue_analysis
 
 
 class RehostTests(unittest.TestCase):
@@ -86,6 +87,16 @@ print('{"type":"turn.completed"}')
         return start(self.directory, description='调查真实入口并运行给定未知输入',
                      inputs=[self.seed], max_rounds=2, **kwargs)
 
+    def test_automatic_start_uses_rehosts_own_default_task_and_continues_it(self):
+        state = continue_analysis(self.directory, materials=[self.seed], max_rounds=1)
+        self.assertEqual(state['status'], 'limit', state)
+        config = read_json(self.directory / 'harness.json')
+        body = Path(config['task_description']).read_text(encoding='utf-8')
+        self.assertIn('调查目标 ARM64 SO，生成可真实运行的 unidbg harness', body)
+        continued = continue_analysis(self.directory, max_rounds=1)
+        self.assertEqual(continued['id'], state['id'])
+        self.assertEqual(continued['status'], 'observed', continued)
+
     def test_empty_project_generation_environment_feedback_and_observation_replay(self):
         state = self.start()
         self.assertEqual(state['status'], 'observed', state)
@@ -120,6 +131,31 @@ print('{"type":"turn.completed"}')
         self.assertEqual((harness / 'src/main/java/lightre/RehostHarness.java').read_bytes(), before)
         archives = list((self.directory / 'rehost').glob('*/previous-association.json'))
         self.assertTrue(any(read_json(path) == config for path in archives))
+
+    def test_service_restart_continues_same_task_and_keeps_completed_work(self):
+        first = start(self.directory, description='调查入口', inputs=[self.seed], max_rounds=1)
+        self.assertEqual(first['status'], 'limit', first)
+        config = read_json(self.directory / 'harness.json')
+        continued = continue_analysis(self.directory, description='继续分析', max_rounds=1)
+        self.assertEqual(continued['status'], 'observed', continued)
+        self.assertEqual(continued['id'], first['id'])
+        self.assertEqual(continued['round'], 2)
+        self.assertEqual(read_json(self.directory / 'harness.json'), config)
+        with patch('rehost.workflow.start', side_effect=AssertionError('must reuse')):
+            again = continue_analysis(self.directory, description='继续分析')
+        self.assertEqual(again['id'], first['id'])
+        self.assertEqual(again['round'], 2)
+        self.assertEqual(len(list((self.directory / 'tasks').glob('harness-*'))), 1)
+
+    def test_restart_after_association_publication_reuses_bootstrap_project(self):
+        with patch('rehost.workflow.repair', side_effect=RuntimeError('process exited before task creation')):
+            with self.assertRaisesRegex(RuntimeError, 'process exited'):
+                self.start()
+        config = read_json(self.directory / 'harness.json')
+        continued = continue_analysis(self.directory, description='继续分析', max_rounds=2)
+        self.assertEqual(continued['status'], 'observed', continued)
+        self.assertEqual(read_json(self.directory / 'harness.json'), config)
+        self.assertEqual(len(list((self.directory.parent / 'harnesses').iterdir())), 1)
 
     def test_independent_fixed_expected_results_can_complete_but_cannot_be_invented(self):
         cases = self.root / 'fixed.json'

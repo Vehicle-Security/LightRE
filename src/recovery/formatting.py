@@ -38,7 +38,7 @@ def _close_signature_gaps(code):
 def format_code(reader, code):
     executable = shutil.which('clang-format')
     if executable is None:
-        raise FormattingError('未安装 clang-format，请运行 scripts/install_deps.sh')
+        raise FormattingError('未安装 clang-format，请在部署环境中安装运行时依赖')
     style = reader.directory / 'source/.clang-format'
     if not style.exists():
         style.parent.mkdir(parents=True, exist_ok=True)

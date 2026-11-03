@@ -2,15 +2,17 @@
 
 import hashlib
 import shutil
+from contextlib import ExitStack
 from pathlib import Path
 
-from execution.contract import Contract
-from execution.guide import ensure
-from execution.loop import repair
-from execution.process import execute
-from execution.runner import _target
-from execution.storage import digest, exclusive, identifier, read_json, write_json
-from workspace import PROJECT_DIR, prepare_workspace
+from .contract import Contract
+from .guide import ensure
+from .loop import run_rounds
+from .process import execute
+from .runner import _target
+from .storage import WriterBusy, digest, exclusive, identifier, read_json, write_json
+from lightre.workspace import PROJECT_DIR, prepare_workspace
+from lightre.prompt import render_prompt
 
 
 WORKFLOWS = Path(__file__).parent / 'workflows/unidbg'
@@ -18,10 +20,10 @@ WORKFLOW = WORKFLOWS / 'WORKFLOW.md'
 MAIN_CLASS = 'lightre.RehostHarness'
 
 
-def start(target, *, description, workspace=None, inputs=(), materials=(), cases_file=None,
+def start(target, *, description=None, workspace=None, inputs=(), materials=(), cases_file=None,
           checker=None, artifacts=(), max_rounds=None, timeout=600, cancelled=lambda: False):
     """Each invocation creates a fresh project; resume is explicit and keeps its files."""
-    if not description.strip():
+    if description is not None and not description.strip():
         raise ValueError('Describe the entry/behavior to run, or request entry investigation explicitly')
     if (max_rounds is not None and max_rounds < 1) or timeout <= 0:
         raise ValueError('max_rounds and timeout must be positive')
@@ -63,7 +65,12 @@ def start(target, *, description, workspace=None, inputs=(), materials=(), cases
     key = identifier()
     harness = target.parent / 'harnesses' / f'{target.name}-rehost-{key}'
     harness.mkdir(parents=True)  # Never seed a new target from an existing Java project.
-    with exclusive(target, harness) as fds:
+    with ExitStack() as stack:
+        try:
+            fds = stack.enter_context(exclusive(target, harness))
+        except WriterBusy:
+            shutil.rmtree(harness)
+            raise
         setup = target / 'rehost' / key
         setup.mkdir(parents=True)
         ensure(harness, target.name, instructions=WORKFLOWS / 'PROJECT.md')
@@ -82,14 +89,10 @@ def start(target, *, description, workspace=None, inputs=(), materials=(), cases
                 ['readelf', *flags, binary['path']], setup, setup / 'inspection' / name,
                 timeout=30, cancelled=cancelled, pass_fds=fds))
         write_json(setup / 'inspection.json', inspection)
-        body = (f'{description}\n\n目标 SO：{binary["path"]}\nSHA256：{binary["sha256"]}\n'
-                f'静态检查：{setup / "inspection.json"}\n'
-                f'静态原始输出：{setup / "inspection"}\n'
-                '每次从零实现目标 Java harness，不复制已有目标的 Java 工程、固定环境或地址。\n'
-                '先调查实际入口与依赖，再通过真实 unidbg 运行逐项补环境。\n'
-                f'检查模式：{mode}；observe 仅保存运行观察，不能宣称行为验证或语义等价。\n'
-                '只读配套资料（含适用的 APK、DEX、资源或既有静态分析）：\n'
-                + ''.join(f'- {path}\n' for path in materials))
+        body = render_prompt(WORKFLOWS / 'TASK.md', DESCRIPTION=description,
+                             BINARY=binary['path'], SHA256=binary['sha256'],
+                             INSPECTION=setup / 'inspection.json', INSPECTION_DIR=setup / 'inspection',
+                             MODE=mode, MATERIALS=''.join(f'- {path}\n' for path in materials))
         (setup / 'task.md').write_text(body, encoding='utf-8')
         protected = [setup / 'task.md', setup / 'inspection.json',
                      *[path for path in (setup / 'inspection').rglob('*') if path.is_file()],
@@ -98,6 +101,7 @@ def start(target, *, description, workspace=None, inputs=(), materials=(), cases
         if cases_file:
             protected.append(cases_file)
         config = {'path': str(harness), **spec, 'cases': str(setup / 'cases.json'),
+                  'workflow': str(WORKFLOW), 'task_description': str(setup / 'task.md'),
                   'protected_files': [str(path) for path in protected]}
         if checker:
             config['checker'] = str(checker)
@@ -105,11 +109,38 @@ def start(target, *, description, workspace=None, inputs=(), materials=(), cases
         if association.exists():
             shutil.copyfile(association, setup / 'previous-association.json')
         write_json(association, config)
-    return repair(target, description=body, workflow=WORKFLOW, bootstrap=True,
+    return run_rounds(target, description=body, workflow=WORKFLOW, bootstrap=True,
                   max_rounds=max_rounds, timeout=timeout, cancelled=cancelled)
 
 
 def resume(directory, task, *, max_rounds=None, timeout=600, cancelled=lambda: False):
     """Continue the same generated project and full round history after rechecking."""
-    return repair(directory, task=task, workflow=WORKFLOW, bootstrap=True,
+    return run_rounds(directory, task=task, workflow=WORKFLOW, bootstrap=True,
                   max_rounds=max_rounds, timeout=timeout, cancelled=cancelled)
+
+
+def continue_analysis(directory, *, description=None, materials=(), max_rounds=None, timeout=600):
+    """Reuse the associated workflow task, including a bootstrap interrupted before task creation."""
+    directory = Path(directory)
+    association = directory / 'harness.json'
+    if association.exists():
+        config = read_json(association)
+        tasks = []
+        for path in (directory / 'tasks').glob('*/state.json'):
+            state = read_json(path)
+            if state.get('mode') != 'harness' or state.get('workflow') != str(WORKFLOW):
+                continue
+            contract = read_json(path.parent / 'contract.json')
+            if contract['harness'] == config['path']:
+                tasks.append((path.parent, state))
+        if tasks:
+            task, state = max(tasks, key=lambda item: item[1]['created_at'])
+            if state['status'] in ('complete', 'observed', 'cancelled'):
+                return state
+            return resume(directory, task, max_rounds=max_rounds, timeout=timeout)
+        if config.get('workflow') == str(WORKFLOW):
+            body = Path(config['task_description']).read_text(encoding='utf-8')
+            return run_rounds(directory, description=body, workflow=WORKFLOW, bootstrap=True,
+                          max_rounds=max_rounds, timeout=timeout)
+    return start(directory, description=description, materials=materials, max_rounds=max_rounds,
+                 timeout=timeout)

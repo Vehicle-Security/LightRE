@@ -18,4 +18,4 @@ tools/venv/bin/python scripts/rehost.py start \
 
 `rehost start` 导入 SO，在原 workspace 的 harnesses 下创建独立工程，先生成 HARNESS.md，再由模型调查并编写 Java。此目标不创建 Dalvik VM，不需要 JNI；workspace 不另建可编辑 C 源码副本。上述命令仅给一个种子，运行成功也只报告 observed、passed=false。历史八例固定预期检查需要显式提供独立用例 JSON 和检查器，不能由种子运行推断通过；新生成流程尚未完成真实模型/unidbg 集成验证。
 
-ABI：`lightre_minilua_run(source,length,chunk,argument)` 每次新建/关闭 Lua 状态，返回实际 Lua 状态；result/length 读取 stdout、stderr 与完整 Proto，vm_entry 提供真实 luaV_execute hook 地址。串行调用，输入/每类输出最多 1MiB，容量或 ABI 错误返回负数。完整 Java ABI 见 [专用说明](../../examples/minilua/ADAPTATION.md)，通用命令见 [功能说明](../../docs/USAGE.md#harness-配置与运行)，真实 small/large 证据见 [交付记录](../../docs/milestones/v0.31/DELIVERY.md)。
+ABI：`lightre_minilua_run(source,length,chunk,argument)` 每次新建/关闭 Lua 状态，返回实际 Lua 状态；result/length 读取 stdout、stderr 与完整 Proto，vm_entry 提供真实 luaV_execute hook 地址。串行调用，输入/每类输出最多 1MiB，容量或 ABI 错误返回负数。完整 Java ABI 见 外部 workspace 的专用说明，通用命令见 [功能说明](../../docs/USAGE.md#harness-配置与运行)，真实 small/large 证据见 [交付记录](../../docs/milestones/v0.31/DELIVERY.md)。

@@ -1,4 +1,48 @@
-"""File-backed outputs and a small SQLite registry shared by Python and CLI clients."""
+"""Agent 管理器 - 管理 Codex sessions 和 runs。
+
+本模块是 agents 库的核心，提供：
+
+## 核心类
+
+- AgentManager  - 管理所有 sessions（基于 SQLite）
+- AgentSession  - 一个持久的 Codex 会话
+- AgentRun      - 一次具体的执行
+
+## 主要函数
+
+- run_blocking(root, directory, cwd, prompt, timeout)  - 顺序执行（阻塞）
+- run_async(root, directory, cwd, prompt, timeout)     - 并发执行（非阻塞）
+- collect_blocking(directory)                          - 收集输出文件
+
+## 使用示例
+
+```python
+from agents import run_blocking, run_async
+
+# 顺序执行（阻塞到完成）
+result = run_blocking(
+    root=agents_root,
+    directory=output_dir,
+    cwd=workspace,
+    prompt=task_prompt
+)
+
+# 并发执行（立即返回）
+run = run_async(root, dir, cwd=workspace, prompt=task_prompt)
+# ... 做其他事情 ...
+result = run.wait()  # 等待完成
+```
+
+## 持久化
+
+所有状态保存在 SQLite 数据库中：
+- {root}/agents.db - sessions 和 runs 的状态
+- {root}/sessions/{id}/ - 每个 session 的文件
+
+## 后台 Worker
+
+run_async() 会自动启动后台 worker 进程执行任务。
+"""
 
 import fcntl
 import json
@@ -158,7 +202,7 @@ class AgentManager:
         finally:
             lease.close()
 
-    def _ensure_worker(self, db, session_id):
+    def _ensure_worker(self, db, session_id, *, pass_fds=()):
         session = self._session(db, session_id)
         if session['paused'] or not db.execute("SELECT 1 FROM runs WHERE session_id=? AND status='queued'",
                                                (session_id,)).fetchone():
@@ -169,9 +213,11 @@ class AgentManager:
         try:
             command = [sys.executable, '-m', 'agents.worker', '--root', str(self.root),
                        '--session', session_id, '--lease-fd', str(lease.fileno())]
+            for fd in pass_fds:
+                command += ['--pass-fd', str(fd)]
             with (self._directory(session_id) / 'worker.log').open('ab') as log:
                 process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=log, stderr=log,
-                                           start_new_session=True, pass_fds=(lease.fileno(),))
+                                           start_new_session=True, pass_fds=(lease.fileno(), *pass_fds))
             db.execute('UPDATE sessions SET worker_pid=?,worker_identity=? WHERE id=?',
                        (process.pid, process_identity(process.pid), session_id))
             threading.Thread(target=process.wait, daemon=True).start()
@@ -187,7 +233,8 @@ class AgentSession:
     def __init__(self, manager, session_id):
         self.manager, self.id = manager, session_id
 
-    def send_message(self, message, *, timeout=600, output_schema=None, request_id=None, delivery='next_turn'):
+    def send_message(self, message, *, timeout=600, output_schema=None, request_id=None, delivery='next_turn',
+                     _pass_fds=()):
         """Persist a message as one queued run. Reusing a request ID is idempotent."""
         if delivery != 'next_turn':
             raise NotImplementedError('codex exec supports queued next_turn messages; live steering requires another transport')
@@ -223,9 +270,11 @@ class AgentSession:
                     _json(directory / 'schema.json', output_schema)
                 db.execute('INSERT INTO runs(id,session_id,request,request_id,status,created_at) '
                            "VALUES (?,?,?,?,'queued',?)", (run_id, self.id, encoded, request_id, time.time()))
-            manager._ensure_worker(db, self.id)
+            manager._ensure_worker(db, self.id, pass_fds=_pass_fds)
         return AgentRun(manager, self.id, run_id)
 
+    # Explicit name for callers that want to emphasize queueing semantics.
+    submit = send_message
     start = send_message
 
     def run(self, message, *, wait_timeout=None, **options):
@@ -341,19 +390,45 @@ class AgentRun:
                 pass  # Raw output and failure remain available for diagnosis.
         return value
 
-    def wait(self, timeout=None, interval=0.1):
+    def iter_states(self, *, timeout=None, interval=0.2):
+        """Yield changed durable states until this run reaches a terminal state.
+
+        The iterator is the non-blocking lifecycle abstraction for callers that
+        need progress updates. It never starts or retries a run; it only reads
+        the persisted state and ends with the terminal state.
+        """
         if timeout is not None and (not math.isfinite(timeout) or timeout < 0):
             raise ValueError('Wait timeout must be nonnegative and finite')
         if not math.isfinite(interval) or interval <= 0:
             raise ValueError('Poll interval must be positive and finite')
         deadline = time.monotonic() + timeout if timeout is not None else None
+        previous = None
         while True:
             value = self.poll()
+            state = tuple(value.get(key) for key in ('status', 'started_at', 'finished_at', 'error', 'exit_code'))
+            if state != previous:
+                previous = state
+                yield value
             if value['terminal']:
-                return self.result()
+                return
             if deadline is not None and time.monotonic() >= deadline:
                 raise TimeoutError('Waiting ended; the agent run has not been cancelled')
             time.sleep(interval)
+
+    def wait(self, timeout=None, interval=0.2, *, on_update=None):
+        """Wait for completion and return the final result.
+
+        ``send_message``/``submit`` remains non-blocking. Use this method when
+        the caller owns a synchronous boundary; use ``iter_states`` or
+        ``poll`` when it owns an event loop. ``on_update`` receives each
+        changed persisted state, including the terminal state.
+        """
+        final = None
+        for value in self.iter_states(timeout=timeout, interval=interval):
+            final = value
+            if on_update is not None:
+                on_update(value)
+        return self.result() if final is not None else self.result()
 
     def cancel(self):
         with self.manager._db() as db:
@@ -378,3 +453,158 @@ class AgentRun:
         if (not alive and row['status'] == 'running' and row['cancel_requested'] and row['cli_pid']
                 and row['cli_identity'] and process_identity(row['cli_pid']) == row['cli_identity']):
             stop_group(row['cli_pid'])
+
+
+# Blocking execution helpers (formerly in turns.py)
+
+def _execution_record(record, directory):
+    """Keep existing business execution records readable during the transition."""
+    result = directory / 'result.md'
+    if not result.is_file():
+        result = directory / 'result.txt'
+    result_exists = result.is_file()
+
+    # 兼容 rehost/loop.py 的格式要求
+    return {
+        **record,
+        'agent_status': record['status'],
+        'status': 'exited' if record['status'] == 'completed' else record['status'],
+        'exit_code': 0 if record['status'] == 'completed' else (record.get('exit_code') or 1),
+        'result': {
+            'path': str(result),
+            'exists': result_exists,
+            'bytes': result.stat().st_size if result_exists else 0
+        }
+    }
+
+
+def run_blocking(root, directory, *, cwd, prompt, timeout=600, cancelled=lambda: False,
+                 pass_fds=(), output_schema=None, **session_options):
+    """Execute Codex in foreground (blocking). Returns when complete.
+
+    Formerly named run_turn. Use for sequential tasks that need to wait for completion.
+    For concurrent tasks, use AgentManager.create() + session.send_message() + run.poll().
+
+    Args:
+        root: Agents root directory
+        directory: Output directory for results
+        cwd: Working directory for execution
+        prompt: Prompt to send to Codex
+        timeout: Timeout in seconds
+        cancelled: Callable that returns True if cancellation requested
+        pass_fds: File descriptors to pass
+        output_schema: Optional output schema path
+        **session_options: Additional session options (model, profile, etc.)
+
+    Returns:
+        Execution record dict with status, exit_code, etc.
+    """
+    directory = Path(directory)
+    if 'sandbox' not in session_options and os.environ.get('LIGHTRE_HARNESS_SANDBOX'):
+        session_options['sandbox'] = os.environ['LIGHTRE_HARNESS_SANDBOX']
+    session = AgentManager(root).create(cwd, persistent=False, **session_options)
+    run = session.send_message(prompt, timeout=timeout, output_schema=output_schema, _pass_fds=pass_fds)
+    _json(directory / 'agent.json', {'root': str(run.manager.root),
+                                    'session_id': session.id, 'run_id': run.id})
+    try:
+        deadline = time.monotonic() + timeout
+        while True:
+            state = run.poll()
+            raw_path = run.directory / 'execution.json'
+            if raw_path.is_file():
+                try:
+                    state = {**json.loads(raw_path.read_text(encoding='utf-8')), **state}
+                except (OSError, ValueError):
+                    pass
+            _json(directory / 'execution.json', _execution_record(state, directory))
+            if state['terminal']:
+                break
+            if cancelled():
+                run.cancel()
+            elif time.monotonic() >= deadline:
+                run.cancel()
+            time.sleep(0.05)
+    finally:
+        collect_blocking(directory)
+    return json.loads((directory / 'execution.json').read_text(encoding='utf-8'))
+
+
+def collect_blocking(directory):
+    """Copy outputs from agent run directory to business directory.
+
+    Agent outputs are stored in agents/sessions/.../runs/xxx/.
+    Business code expects them in their own directory (e.g., tasks/round-0001/).
+    This function copies the agent event/log files and normalizes the Codex
+    ``result.txt`` output to the business-facing ``result.md`` name.
+
+    Args:
+        directory: Business output directory containing agent.json
+
+    Returns:
+        Execution record dict
+    """
+    directory = Path(directory)
+    reference = json.loads((directory / 'agent.json').read_text(encoding='utf-8'))
+    run = AgentManager(reference['root']).get(reference['session_id']).get_run(reference['run_id'])
+    state = run.poll()
+    if not state['terminal']:
+        raise RuntimeError('Execution has not finished')
+    run_dir = Path(run.directory)
+    for name in ('events.jsonl', 'result.json', 'stderr.log'):
+        source = run_dir / name
+        if source.exists():
+            shutil.copy2(source, directory / name)
+    result = run_dir / 'result.txt'
+    if not result.exists():
+        result = run_dir / 'result.md'
+    if result.exists():
+        shutil.copy2(result, directory / 'result.md')
+    execution = {}
+    saved_execution = run_dir / 'execution.json'
+    if saved_execution.exists():
+        try:
+            execution.update(json.loads(saved_execution.read_text(encoding='utf-8')))
+        except (OSError, ValueError):
+            pass
+    execution.update(state)
+    execution = _execution_record(execution, directory)
+    _json(directory / 'execution.json', execution)
+    return execution
+
+
+def run_async(root, directory, *, cwd, prompt, timeout=600, **session_options):
+    """Execute Codex asynchronously (non-blocking). Returns immediately.
+
+    Use for concurrent tasks. For sequential tasks, use run_blocking().
+
+    Args:
+        root: Agents root directory
+        directory: Output directory for results
+        cwd: Working directory for execution
+        prompt: Prompt to send to Codex
+        timeout: Timeout in seconds
+        **session_options: Additional session options (model, profile, etc.)
+
+    Returns:
+        AgentRun object (call .wait() to block until completion)
+
+    Example:
+        # Launch multiple runs
+        runs = []
+        for task in tasks:
+            run = run_async(root, task_dir, cwd=..., prompt=task_prompt)
+            runs.append(run)
+
+        # Wait for all
+        results = [run.wait() for run in runs]
+    """
+    directory = Path(directory)
+    session = AgentManager(root).create(cwd, persistent=False, **session_options)
+
+    # Start background execution (non-blocking)
+    run = session.send_message(prompt, timeout=timeout)
+
+    # Save reference for later collection
+    _json(directory / 'agent.json', {'root': str(run.manager.root),
+                                    'session_id': session.id, 'run_id': run.id})
+    return run

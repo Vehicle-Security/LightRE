@@ -1,11 +1,11 @@
 import sqlite3
-import sys
+import hashlib
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from workspace import RESULT_SCHEMA, WorkspaceReader, prepare_workspace
+from lightre.workspace import RESULT_SCHEMA, WorkspaceReader, prepare_workspace
 
 
 class WorkspaceTests(unittest.TestCase):
@@ -45,34 +45,39 @@ class WorkspaceTests(unittest.TestCase):
             WorkspaceReader(missing)
         self.assertFalse(missing.exists())
 
-    def test_default_workspace_uses_working_directory_outside_sample_repo(self):
+    def test_default_workspace_reuses_so_and_executable_results_outside_sample_repo(self):
         repo = self.directory / "samples"
-        source = repo / "target"
-        source.mkdir(parents=True)
-        (repo / ".git").mkdir()
-        binary = source / "example.so"
-        binary.write_bytes(b"test binary")
-        workdir = self.directory / "work"
-        with patch("workspace.Path.cwd", return_value=workdir):
-            result = prepare_workspace(binary)
-            self.assertEqual(prepare_workspace(binary), result)
-        self.assertEqual(result.parent, workdir / "target-analysis")
-        self.assertEqual(list(result.parent.iterdir()), [result])
+        repo.mkdir()
+        (repo / '.git').mkdir()
+        workdir = self.directory / 'work'
+        for name in ('target/example.so', 'minilua/deliverable/minilua'):
+            with self.subTest(input=name):
+                binary = repo / name
+                binary.parent.mkdir(parents=True)
+                binary.write_bytes(name.encode())
+                with patch('lightre.workspace.Path.cwd', return_value=workdir):
+                    result = prepare_workspace(binary)
+                    self.assertEqual(prepare_workspace(binary), result)
+                self.assertEqual(result.parent, workdir / 'workspace')
+                self.assertEqual((result / 'binary/original.so').read_bytes(), binary.read_bytes())
+                self.assertEqual(list(binary.parent.iterdir()), [binary])
+        self.assertEqual(len(list((workdir / 'workspace').glob('*/index.sqlite'))), 2)
         with self.assertRaisesRegex(ValueError, "样本 Git"):
             prepare_workspace(binary, repo / "results")
 
-    def test_executable_default_workspace_uses_binary_name_and_reuses_result(self):
-        source = self.directory / "samples/minilua/deliverable"
-        source.mkdir(parents=True)
-        binary = source / "minilua"
-        binary.write_bytes(b"test executable")
-        workdir = self.directory / "work"
-        with patch("workspace.Path.cwd", return_value=workdir):
-            result = prepare_workspace(binary)
-            self.assertEqual(prepare_workspace(binary), result)
-        self.assertEqual(result.parent, workdir / "minilua-analysis")
-        self.assertEqual(list(result.parent.iterdir()), [result])
-        self.assertEqual(list(source.iterdir()), [binary])
+    def test_hash_prefix_collision_extends_name_and_full_hash_reuses_the_result(self):
+        source = self.directory / 'inputs'
+        source.mkdir()
+        binary = source / 'target.so'
+        binary.write_bytes(b'target content')
+        digest = hashlib.sha256(binary.read_bytes()).hexdigest()
+        workspace = self.directory / 'results'
+        occupied = workspace / f'target-{digest[:4]}'
+        occupied.mkdir(parents=True)
+        result = prepare_workspace(binary, workspace, name='target')
+        self.assertEqual(result.name, f'target-{digest[:5]}')
+        self.assertEqual(prepare_workspace(binary, workspace, name='target'), result)
+        self.assertTrue(occupied.is_dir())
 
 
 if __name__ == "__main__":

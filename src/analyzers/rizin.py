@@ -11,7 +11,7 @@ def find_rizin() -> str:
     local = TOOLS_DIR / "rizin/bin/rizin"
     found = str(local) if local.is_file() else shutil.which("rizin")
     if not found:
-        raise RuntimeError("找不到 Rizin，请先运行 scripts/install_deps.sh --with-rizin")
+        raise RuntimeError("找不到 Rizin，请在部署环境中安装运行时依赖")
     return found
 
 

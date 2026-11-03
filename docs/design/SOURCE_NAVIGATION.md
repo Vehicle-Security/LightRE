@@ -218,7 +218,7 @@ Web 约每 3 秒查询轻量发布 revision 和进度，源码、路径、来源
 首次安装开发依赖，之后只运行第二条命令；命令均从工具仓库根目录执行：
 
 ```bash
-tools/venv/bin/python -m pip install -r requirements-dev.txt
+uv sync --locked
 tools/venv/bin/python -m unittest discover -s tests -p 'test_source_api.py' -v
 ```
 

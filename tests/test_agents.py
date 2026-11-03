@@ -1,9 +1,9 @@
-"""Real cross-process registry/queue tests against a local fake CLI; no model."""
+"""Agent registry and queue tests against a local fake Codex process; no model."""
 
 import json
+import fcntl
 import os
 import signal
-import subprocess
 import sys
 import tempfile
 import time
@@ -12,17 +12,17 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import patch
 
-from agents import AgentManager
+from agents import AgentManager, run_blocking
 from agents.codex import process_identity, read_events
 
-PROJECT = Path(__file__).resolve().parents[1]
-CLI = PROJECT / 'scripts/agent.py'
 FAKE = r'''
 import json, os, subprocess, sys, time, uuid
 from pathlib import Path
 args = sys.argv[1:]
 prompt = sys.stdin.read()
 data = json.loads(prompt)
+if 'lock_fd' in data:
+    assert os.fstat(data['lock_fd']).st_ino == Path(data['lock_path']).stat().st_ino
 thread = args[args.index('resume') + 1] if 'resume' in args else str(uuid.uuid4())
 print(json.dumps({'type':'thread.started', 'thread_id':thread}), flush=True)
 print(json.dumps({'type':'turn.started'}), flush=True)
@@ -78,14 +78,26 @@ class AgentTests(unittest.TestCase):
     def session(self, **options):
         return self.manager.create(self.cwd, executable=self.executable, **options)
 
+    def test_blocking_bridge_collects_schema_output_and_inherits_writer_lock(self):
+        output = self.directory / 'business-output'
+        output.mkdir()
+        schema = {'type': 'object', 'properties': {'binary': {'type': 'string'}},
+                  'required': ['binary'], 'additionalProperties': False}
+        with (self.directory / 'writer.lock').open('a+') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            result = run_blocking(
+                self.root, output, cwd=self.cwd, executable=str(self.executable),
+                prompt=json.dumps({'reply': '{"binary":"target.so"}', 'lock_fd': lock.fileno(),
+                                   'lock_path': lock.name}),
+                output_schema=schema, pass_fds=(lock.fileno(),), timeout=5,
+            )
+        self.assertEqual(result['status'], 'exited', result)
+        self.assertEqual(json.loads((output / 'result.md').read_text()), {'binary': 'target.so'})
+        self.assertIn('--output-schema', result['command'])
+        self.assertTrue((output / 'agent.json').is_file())
+
     def send(self, session, **message):
         return session.send_message(json.dumps(message, ensure_ascii=False))
-
-    def cli(self, *args, input=None, expected=0):
-        process = subprocess.run([sys.executable, str(CLI), '--root', str(self.root), *map(str, args)],
-                                 input=input, text=True, capture_output=True, timeout=8)
-        self.assertEqual(process.returncode, expected, process.stdout + process.stderr)
-        return json.loads(process.stdout if expected != 2 else process.stderr)
 
     def test_python_can_reattach_using_local_session_run_and_codex_thread_ids(self):
         session = self.session()
@@ -103,36 +115,6 @@ class AgentTests(unittest.TestCase):
         self.assertEqual(result['exit_code'], 0)
         for name in ('prompt.md', 'request.json', 'execution.json', 'result.txt', 'events.jsonl', 'stderr.log'):
             self.assertTrue((run.directory / name).exists(), name)
-
-    def test_another_cli_process_can_queue_message_and_read_result_and_events(self):
-        created = self.cli('create', '--cwd', self.cwd, '--codex', self.executable)
-        session_id = created['id']
-        marker, gate = self.directory / 'started', self.directory / 'gate'
-        first = self.cli('send', '--session', session_id, '--message-file', '-',
-                         input=json.dumps({'marker': str(marker), 'gate': str(gate), 'reply': '第一轮'}))
-        self.until(marker.exists)
-        live = self.cli('run', '--session', session_id)
-        self.assertEqual(live['id'], first['id'])
-        self.assertEqual(live['status'], 'running')
-        prompt = json.dumps({'reply': '第二轮\n`literal` $(literal)'}, ensure_ascii=False)
-        second = self.cli('send', '--session', session_id, '--message', prompt, '--request-id', 'comment-2')
-        self.assertEqual(second['status'], 'queued')
-        state = self.cli('status', '--session', session_id)
-        self.assertEqual(state['queued'], 1)
-        gate.touch()
-        result = self.cli('wait', '--session', session_id, '--run', second['id'], '--timeout', 6)
-        self.assertEqual(result['text'], '第二轮\n`literal` $(literal)')
-        self.assertEqual(result['thread_id'], marker.read_text())
-        page = self.cli('events', '--session', session_id, '--run', second['id'])
-        event = next(item for item in page['events'] if item['type'] == 'fixture.input')
-        self.assertEqual(event['prompt'], prompt)
-        self.assertEqual(event['cwd'], str(self.cwd))
-        self.assertEqual(event['argv'][event['argv'].index('resume') + 1], result['thread_id'])
-        self.assertNotIn('--last', event['argv'])
-        self.assertNotIn('--ephemeral', event['argv'])
-        self.assertEqual(self.cli('result', '--session', session_id, '--run', second['id'])['text'], result['text'])
-        duplicate = self.manager.get(session_id).send_message(prompt, timeout=600.0, request_id='comment-2')
-        self.assertEqual(duplicate.id, second['id'], 'Python and CLI must normalize equivalent options identically')
 
     def test_session_serialization_independent_sessions_and_idempotent_submission(self):
         first, second = self.session(), self.session()
@@ -215,8 +197,6 @@ class AgentTests(unittest.TestCase):
         self.assertFalse(session.snapshot()['capabilities']['conversation_context'])
         with self.assertRaisesRegex(NotImplementedError, 'live steering'):
             session.send_message('now', delivery='immediate')
-        error = self.cli('send', '--session', session.id, '--message', 'now', '--delivery', 'immediate', expected=2)
-        self.assertEqual(error['type'], 'NotImplementedError')
 
     def test_worker_death_is_not_completion_and_no_live_writer_is_duplicated(self):
         session = self.session()
@@ -227,9 +207,9 @@ class AgentTests(unittest.TestCase):
         os.kill(owner, signal.SIGKILL)
         self.until(lambda: process_identity(owner) is None)
         queued = self.send(session, reply='must wait for review')
-        self.assertEqual(run.poll()['status'], 'running', 'CLI still holds the writer lease')
+        self.assertEqual(run.poll()['status'], 'running', 'worker still holds the writer lease')
         self.assertEqual(queued.poll()['status'], 'queued')
-        run.cancel()  # A different process can stop the known CLI after its worker died.
+        run.cancel()  # A different manager can stop the known worker after it dies.
         self.until(lambda: run.poll()['terminal'])
         self.assertEqual(run.result()['status'], 'cancelled')
         self.assertTrue(session.snapshot()['paused'])
@@ -285,13 +265,13 @@ class AgentTests(unittest.TestCase):
         marker, gate = self.directory / 'started', self.directory / 'gate'
         first = self.send(session, marker=str(marker), gate=str(gate))
         self.until(marker.exists)
-        self.cli('pause', '--session', session.id)
+        session.pause()
         second = self.send(session)
         gate.touch()
         self.assertEqual(first.wait(6)['status'], 'completed')
         self.until(lambda: not session.snapshot()['worker_alive'])
         self.assertEqual(second.poll()['status'], 'queued')
-        self.cli('resume', '--session', session.id)
+        session.resume()
         self.assertEqual(second.wait(6)['status'], 'completed')
 
     def test_known_thread_ids_are_required_and_run_lookup_cannot_cross_sessions(self):
@@ -305,6 +285,16 @@ class AgentTests(unittest.TestCase):
             self.manager.get_run('unknown')
         self.assertEqual(run.wait(6)['status'], 'completed')
 
+
+    def test_submit_wait_and_iter_states_abstract_nonblocking_lifecycle(self):
+        session = self.session()
+        states = []
+        run = session.submit(json.dumps({'reply': '抽象完成'}))
+        result = run.wait(6, on_update=states.append)
+        self.assertEqual(result['text'], '抽象完成')
+        self.assertTrue(states)
+        self.assertTrue(states[-1]['terminal'])
+        self.assertEqual(run.result()['text'], result['text'])
 
 if __name__ == '__main__':
     unittest.main()
