@@ -1,8 +1,5 @@
 """REST routes exposed to external LightRE clients."""
 
-import json
-from pathlib import Path
-
 from fastapi import APIRouter, HTTPException, Response
 
 
@@ -12,7 +9,9 @@ def router_for(reader, *, status=None):
     @router.get('/status')
     def analysis_status(response: Response):
         response.headers['Cache-Control'] = 'no-store'
-        return status() if status else {'ready': True, 'status': 'ready', 'phase': 'ready'}
+        from rehost.progress import workflow_status
+        return status() if status else {'ready': True, 'status': 'ready', 'phase': 'ready',
+                                       'workflow': workflow_status(reader.directory)}
 
     @router.get('/health')
     def health():
@@ -20,10 +19,22 @@ def router_for(reader, *, status=None):
 
     @router.get('/workflow')
     def workflow():
-        path = Path(reader.directory) / 'main-workflow.json'
-        if not path.is_file():
-            return {'status': 'not_started'}
-        return json.loads(path.read_text(encoding='utf-8'))
+        from rehost.progress import workflow_status
+        return workflow_status(reader.directory)
+
+    @router.get('/rehost')
+    def rehost_progress(response: Response):
+        from rehost.progress import progress
+        response.headers['Cache-Control'] = 'no-store'
+        return progress(reader.directory)
+
+    @router.post('/rehost/retry', status_code=202)
+    def retry_rehost():
+        from lightre.main_workflow import retry_rehost
+        try:
+            return retry_rehost(reader)
+        except (RuntimeError, ValueError, OSError) as error:
+            raise HTTPException(409, str(error)) from error
 
     @router.get('/workspace')
     def workspace():

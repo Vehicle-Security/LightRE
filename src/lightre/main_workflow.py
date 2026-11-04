@@ -128,45 +128,73 @@ def start_workflow(reader, rvas=None, *, workers=None, input_mode='reference', s
             lock.close()
             return state
 
-        def run():
-            try:
-                while True:
-                    # Both workflows publish under tasks/.lock; let queued Recovery finish first.
-                    if any(job['status'] in ('queued', 'running') for job in snapshot(reader)):
-                        state['rehost'] = {'status': 'waiting_for_recovery'}
-                        write_json(path, state)
-                        time.sleep(0.5)
-                        continue
-                    try:
-                        manifest = reader.directory.parent / 'target.json'
-                        materials = []
-                        if manifest.exists():
-                            source = (manifest.parent / read_json(manifest)['source_dir']).resolve()
-                            if source.is_dir():
-                                materials = [source]
-                        state['rehost'] = {'status': 'running'}
-                        write_json(path, state)
-                        state['rehost'] = continue_rehost(
-                            reader.directory, materials=materials, max_rounds=None,
-                            timeout=1800,
-                        )
-                        break
-                    except WriterBusy:
-                        time.sleep(0.5)
-            except Exception as error:
-                state['rehost'] = {'status': 'error', 'error': str(error)}
-            finally:
-                try:
-                    identifier = (state.get('recovery') or {}).get('id')
-                    state['recovery'] = next((job for job in snapshot(reader) if job['id'] == identifier),
-                                             state.get('recovery'))
-                    state['status'] = 'rehost_finished'
-                    write_json(path, state)
-                finally:
-                    lock.close()
-
-        threading.Thread(target=run, name='lightre-rehost', daemon=True).start()
+        _launch_rehost(reader, state, path, lock)
         return state
     except BaseException:
         lock.close()
         raise
+
+
+def retry_rehost(reader):
+    """Retry only Rehost, retaining its harness, contract and round history."""
+    path = reader.directory / 'main-workflow.json'
+    lock = (reader.directory / '.workflow.lock').open('a+')
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        state = read_json(path) if path.exists() else {'recovery': None}
+        _launch_rehost(reader, state, path, lock, retry=True)
+        return {'status': 'accepted'}
+    except BlockingIOError:
+        lock.close()
+        raise WriterBusy('Rehost 已在执行或等待 Recovery，无需重复提交') from None
+    except BaseException:
+        lock.close()
+        raise
+
+
+def _launch_rehost(reader, state, path, lock, *, retry=False):
+    requested_at = time.time()
+    state.update(status='running', rehost={'status': 'starting', 'requested_at': requested_at})
+    write_json(path, state)
+
+    def run():
+        try:
+            while True:
+                # Recovery and Rehost share one SO writer lock.
+                if any(job['status'] in ('queued', 'running') for job in snapshot(reader)):
+                    state['rehost'] = {'status': 'waiting_for_recovery', 'requested_at': requested_at}
+                    write_json(path, state)
+                    time.sleep(0.5)
+                    continue
+                try:
+                    manifest = reader.directory.parent / 'target.json'
+                    materials = []
+                    if manifest.exists():
+                        source = (manifest.parent / read_json(manifest)['source_dir']).resolve()
+                        if source.is_dir():
+                            materials = [source]
+                    state['rehost'] = {'status': 'running', 'requested_at': requested_at}
+                    write_json(path, state)
+                    options = {'retry': True} if retry else {}
+                    state['rehost'] = continue_rehost(
+                        reader.directory, materials=materials, max_rounds=None,
+                        timeout=1800, **options,
+                    )
+                    break
+                except WriterBusy:
+                    state['rehost'] = {'status': 'waiting_for_writer', 'requested_at': requested_at}
+                    write_json(path, state)
+                    time.sleep(0.5)
+        except Exception as error:
+            state['rehost'] = {'status': 'error', 'error': str(error)}
+        finally:
+            try:
+                identifier = (state.get('recovery') or {}).get('id')
+                state['recovery'] = next((job for job in snapshot(reader) if job['id'] == identifier),
+                                         state.get('recovery'))
+                state['status'] = 'rehost_finished'
+                write_json(path, state)
+            finally:
+                lock.close()
+
+    threading.Thread(target=run, name='lightre-rehost', daemon=True).start()

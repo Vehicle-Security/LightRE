@@ -26,7 +26,7 @@ LightRE 面向可联网、具有 root 权限的 Ubuntu 24.04 基础容器。无�
 ./lightre ../target-dir --workspace ../analysis-workspace
 ```
 
-无需提前创建目录或复制 SO。完成依赖准备后先启动 HTTP 服务，目录探索及 Ghidra 静态导出在后台运行；页面通过始终可用的 `GET /api/status` 展示当前阶段、耗时和最近日志。静态分析完成后自动启动或恢复 Recovery，页面自动加载函数并持续显示处理数量、候选数量和队列进度，随后显示 Rehost 状态。页面等 workspace 就绪后才请求函数列表；准备期间直接访问工作区相关 API 仍返回 HTTP 503。后台失败会在页面显示具体错误。首次启动自动保存原始 SO 副本并导出函数、完整汇编和参考伪代码。产物结构为：
+无需提前创建目录或复制 SO。完成依赖准备后先启动 HTTP 服务，目录探索及 Ghidra 静态导出在后台运行；页面通过始终可用的 `GET /api/status` 展示任务状态，不展示 Ghidra 日志。静态分析完成后自动启动或恢复 Recovery，页面自动加载函数并持续显示处理数量、候选数量和队列进度，随后显示 Rehost 状态。页面等 workspace 就绪后才请求函数列表；准备期间直接访问工作区相关 API 仍返回 HTTP 503。后台失败会在页面显示具体错误。首次启动自动保存原始 SO 副本并导出函数、完整汇编和参考伪代码。产物结构为：
 
 ```text
 <workspace>/<sample>-<sha>/
@@ -59,9 +59,11 @@ workspace 根目录的 `target.json` 保存输入目录相对位置、主 SO、�
 | --- | --- | --- |
 | GET | `/api/health` | 服务和 workspace 状态 |
 | GET | `/api/workspace` | 样本元数据和函数目录 |
-| GET | `/api/workflow` | `main-workflow.json` 的当前内容 |
+| GET | `/api/workflow` | 主流程及实时 Rehost 证据 |
 | GET | `/api/recovery` | Recovery 队列和函数状态 |
 | POST | `/api/recovery/resume` | 恢复或提交 Recovery 任务 |
+| GET | `/api/rehost` | Rehost 轮次、步骤、构建和执行结果、运行输出摘要 |
+| POST | `/api/rehost/retry` | 异步重试或重新验证，复用原 harness、固定用例和任务记录 |
 
 函数浏览器由 `webui` 模块提供，服务挂载在 `/ui/`；浏览器内部接口包括 `/api/functions`、`/api/functions/{rva}/assembly`、`/api/functions/{rva}/candidate`、评论和任务控制接口。`POST /api/functions/{rva}/recover` 重新分析指定函数，包括已经有 LLM 候选的函数。页面读取保存结果，重新分析和评论由 Recovery 队列异步处理。
 
@@ -69,7 +71,11 @@ workspace 根目录的 `target.json` 保存输入目录相对位置、主 SO、�
 
 Recovery 处理函数候选和 Knowledge：
 
-页面“任务详情”按模块展示：Recovery 区域提供“暂停队列”“恢复队列”和“分析剩余 N 个函数”，控制函数分析与修改建议任务；Rehost 区域单独展示运行验证状态及错误。
+页面“任务详情”这一行提供 Recovery、Rehost 标签，标签内显示实时进展；单击栏或标签展开，点击标签切换面板，双击栏内任意位置收起。详情默认折叠，每次只展示一个模块；支持左右方向键切换标签，在栏标题上按 Enter 或空格切换展开状态。顶部工具栏仅保留工作区信息和主题切换。Recovery 标签显示正在处理的任务与数量，空闲时显示未解决、失败或 LLM 已处理数量；完整覆盖率放在 Recovery 面板中。Rehost 运行时显示轮次与实际步骤；仅返回时显示“待等价验证”，固定用例通过后显示“待差分逆向”。差分测试逆向阶段尚未接入，这些状态均不表示整体分析完成。
+
+Recovery 区域提供“暂停队列”“恢复队列”和“分析剩余 N 个函数”；每条任务都能展开查看模型活动、处理结果和失败／未解决原因，点击函数可查看源码与分析上下文。Rehost 区域展示当前修复轮次与实际步骤（模型修改、编译、unidbg 执行、结果检查），以及编译结果、进程退出码、harness 报告的 native 返回、固定用例执行数量、报错和运行输出。native 返回与独立期望验证分开显示。
+
+Rehost 失败或中断后可“重试 Rehost”；已完成或仅记录观察时可“重新验证”。按钮只提交 Rehost，保留既有 harness 与契约，从当前文件重新构建、运行和检查，失败时继续修复。接口立即返回 HTTP 202；已有协调任务执行或等待时返回 HTTP 409，避免重复提交。运行中约每 3 秒刷新 Rehost 状态。升级后需重启服务加载新的后端接口和进度记录逻辑。
 
 升级 Prompt 不会自动改写已有分析结果，“分析剩余 N 个函数”跳过已有 LLM 候选的函数。要用当前规则改善旧结果，重启服务加载更新后，选中函数并点击“重新分析”；它保留当前代码和 Knowledge 作为输入，使用 `RECOVER.md` 创建定向任务，完成后刷新函数名称和源码。原始 catalog 名称和 RVA 不变，界面显示当前 C 名称。
 

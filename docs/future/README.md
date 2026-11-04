@@ -12,6 +12,7 @@
 | [SOURCE_MANAGEMENT.md](SOURCE_MANAGEMENT.md) | 源码管理与符号迁移（代码已删，规划恢复） | V0.4 |
 | [MAIN_WORKFLOW.md](MAIN_WORKFLOW.md) | Recovery、Rehost、差分的顶层循环 | V0.4+ |
 | [VM_RECOVERY.md](VM_RECOVERY.md) | VM 分析方法与语义恢复里程碑（M0-M6，含平坦化/MBA 处理方法） | 方法论，长期 |
+| [OPTIMIZATION.md](OPTIMIZATION.md) | 代码/文档/测试的简化与精简清单（2026-11-03 审计） | 持续 |
 
 尚未接入执行器的[工程恢复模板](prompts/RECOVER_AND_REFINE.md)和
 [构建与验证模板](prompts/BUILD_AND_VERIFY.md)保存在 `prompts/`，仅供设计参考，

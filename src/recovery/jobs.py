@@ -76,6 +76,7 @@ def task_state(reader):
 
 def progress(reader):
     from .queue import snapshot
+    from .feedback import _activity, _elapsed
     functions = reader.catalog()["functions"]
     origins = candidate_origins(reader)
     optimized = {rva for rva, origin in origins.items() if origin == "llm"}
@@ -98,6 +99,12 @@ def progress(reader):
               'rvas', 'done_rvas', 'current', 'active_batches', 'workers', 'comment', 'directory', 'error', 'parent_task', 'followup_id', 'input_mode')
     queue = [{key: job[key] for key in fields if key in job} for job in jobs]
     for item, job in zip(queue, jobs):
+        item['elapsed_seconds'] = _elapsed(job)
+        current = job.get('current') or []
+        rva = int(current[0], 0) if current else next(iter(job.get('rvas', [])), None)
+        item['activity'] = _activity(job, rva) if rva is not None else None
+        if state.get('status') == 'interrupted' and job.get('id') == state.get('id'):
+            item.update(status='interrupted', error=state.get('error'), activity=None)
         failures = job.get('failed_rvas', {})
         issues = {int(rva, 0): {'rva': int(rva, 0), 'status': 'unresolved', 'reason': str(reason)[:500]}
                   for rva, reason in job.get('unresolved', {}).items()}

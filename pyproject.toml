@@ -36,5 +36,5 @@ namespaces = false
 "*" = ["*.md", "**/*.md"]
 lightre = ["resources/*"]
 analyzers = ["ghidra_scripts/*.java"]
-rehost = ["workflows/unidbg/*.xml", "knowledge/*.md"]
+rehost = ["workflows/unidbg/*.xml", "workflows/unidbg/src/**/*.java", "knowledge/*.md"]
 webui = ["index.html", "static/*"]

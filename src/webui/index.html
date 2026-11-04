@@ -44,28 +44,16 @@ header{flex-shrink:0;background:var(--chrome)}
 .sample{min-width:160px;flex:0 1 320px}
 .eyebrow{font-size:8px;letter-spacing:1.5px;color:var(--muted);margin-bottom:2px}
 .sample-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:550}
-.topbar-status{max-width:520px;flex:0 1 520px;min-width:0;overflow:hidden;margin-left:auto}
-.topbar-status .analysis-caption{min-width:0;max-width:100%;flex-direction:column;align-items:flex-start;gap:1px;overflow:hidden}
-.topbar-status .analysis-caption strong{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;line-height:17px;color:var(--text)}
-.topbar-status .analysis-caption span{max-width:100%;overflow:hidden;text-overflow:ellipsis}
-.topbar-status[data-state=error] strong{color:var(--error)}
-.header-actions{display:flex;align-items:center;gap:8px}
-.analysis-progress{padding:0 16px;background:var(--panel)}
-.analysis-caption{display:flex;justify-content:space-between;gap:12px;align-items:center}
-.analysis-caption strong{font-size:15px;line-height:21px;font-weight:650}
-.analysis-caption span{color:var(--muted);font:11px var(--mono);white-space:nowrap}
-.analysis-progress[data-state=error] strong{color:var(--error)}
-.analysis-progress details{margin-top:7px;color:var(--muted);font-size:11px}
-.analysis-progress details summary{display:flex;justify-content:space-between;align-items:center;gap:16px;cursor:pointer;user-select:none;color:var(--text)}
-.analysis-log-label{flex:0 0 auto;color:var(--text)}
-.analysis-log-caption{padding-top:7px;color:var(--text);font-size:11px}
-.analysis-log-body{margin-top:7px}
-.analysis-bar{height:5px;overflow:hidden;background:var(--line);border-radius:3px}
-.analysis-bar-fill{height:100%;width:35%;background:var(--accent);border-radius:3px;transform:translateX(-120%)}
-.analysis-bar[data-mode="indeterminate"] .analysis-bar-fill{animation:analysis-sweep .75s linear infinite}
-.analysis-bar[data-mode="determinate"] .analysis-bar-fill{transform:none;transition:width .18s ease-out}
-@keyframes analysis-sweep{from{transform:translateX(-120%)}to{transform:translateX(320%)}}
-.analysis-progress pre{max-height:120px;margin:7px 0 0;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font:11px/1.5 var(--mono)}
+.workflow-tabs{display:flex;align-items:center;gap:4px;min-width:0}
+.workflow-step{display:inline-flex;align-items:center;gap:7px;min-width:0;max-width:300px;padding:4px 9px;border:1px solid transparent;border-radius:4px;background:none;text-align:left;color:var(--muted)}
+.workflow-step:hover{background:var(--hover)}
+.workflow-step[aria-selected=true]{border-color:var(--line);background:var(--selected);color:var(--text)}
+.workflow-step strong{flex-shrink:0;font-size:11px;font-weight:550;white-space:nowrap}
+.workflow-step strong::before{content:'●';font-size:9px;color:var(--muted);margin-right:6px}
+.workflow-step[data-state=running] strong::before{color:var(--accent)}
+.workflow-step[data-state=error] strong::before{color:var(--error)}
+.workflow-step span{min-width:0;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--muted)}
+.header-actions{display:flex;align-items:center;gap:8px;margin-left:auto}
 .toolbar-button{border:1px solid var(--line);background:var(--bg);color:var(--text);border-radius:5px;padding:7px 10px;font-size:11px;white-space:nowrap;display:flex;align-items:center;gap:7px}
 .toolbar-button:hover{background:var(--hover)}
 .toolbar-button svg{width:16px;height:16px;flex-shrink:0}
@@ -110,6 +98,7 @@ input::-webkit-search-cancel-button{appearance:none}
 .function[aria-current=true] .addr,.function[aria-current=true] .lines{color:var(--accent)}
 .list-empty{padding:22px 12px;color:var(--muted);line-height:1.8}
 .sidebar-foot{border-top:1px solid var(--line);min-height:28px;padding:5px 10px;font-size:11px;line-height:17px;color:var(--muted)}
+.sidebar-foot:empty{display:none}
 main{display:flex;flex-direction:column;min-height:0;min-width:0}
 .function-header{min-height:40px;padding:8px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;flex-wrap:wrap;gap:4px 20px}
 h1{min-width:0;font:500 16px var(--mono);margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -136,7 +125,6 @@ h1{min-width:0;font:500 16px var(--mono);margin:0;overflow:hidden;text-overflow:
 .feedback-bar{padding:6px 16px;border-top:1px solid var(--line);display:flex;gap:6px;align-items:center;flex-wrap:wrap;flex-shrink:0}
 .feedback-bar textarea{resize:vertical;min-height:32px;max-height:160px;flex:1;min-width:160px;background:var(--input);color:var(--text);border:1px solid var(--line);padding:5px}
 .feedback-status{font-size:11px;color:var(--muted)}
-.feedback-hint{width:100%;font-size:10px;color:var(--muted)}
 .source-progress{flex-shrink:0;padding:6px 16px 4px;border-top:1px solid var(--line);font-size:11px;color:var(--muted)}
 .source-progress-caption{display:flex;justify-content:space-between;gap:10px;line-height:18px}
 .source-progress-controls{display:flex;align-items:center;gap:8px;flex-shrink:0}
@@ -145,7 +133,7 @@ h1{min-width:0;font:500 16px var(--mono);margin:0;overflow:hidden;text-overflow:
 .source-progress-fill{height:100%;width:35%;background:var(--accent);border-radius:2px;opacity:0}
 .source-progress[data-state="running"] .source-progress-fill{opacity:1;animation:source-activity 1.5s ease-in-out infinite alternate}
 @keyframes source-activity{from{transform:translateX(0)}to{transform:translateX(185%)}}
-@media(prefers-reduced-motion:reduce){.source-progress[data-state="running"] .source-progress-fill{animation:none;width:100%;opacity:.6}.analysis-bar[data-mode="indeterminate"] .analysis-bar-fill{animation:none;transform:none;opacity:.65}}
+@media(prefers-reduced-motion:reduce){.source-progress[data-state="running"] .source-progress-fill{animation:none;width:100%;opacity:.6}}
 .feedback-history{flex-shrink:0;max-height:220px;overflow:auto;padding:0 16px;border-top:1px solid var(--line);font-size:12px}
 .feedback-history-controls{display:flex;justify-content:flex-end;padding:4px 0}
 .feedback-item{padding:7px 0;border-bottom:1px solid var(--line)}
@@ -163,24 +151,35 @@ h1{min-width:0;font:500 16px var(--mono);margin:0;overflow:hidden;text-overflow:
 .feedback-changes>summary{cursor:pointer;color:var(--accent);font-size:11px;overflow-wrap:anywhere}
 .queue-jump{border:0;background:none;text-align:left;font:inherit;color:inherit;padding:0;cursor:pointer}
 .queue-jump:hover{color:var(--accent)}
-.queue-functions{padding:2px 0 5px 12px;display:flex;gap:5px 14px;flex-wrap:wrap}
-.queue-functions[hidden]{display:none}
-.queue-functions button{color:var(--accent)}
 .recovery-status{font-size:11px;color:var(--muted)}
-.task-queue{flex-shrink:0;border-bottom:1px solid var(--line);background:var(--chrome);font-size:11px;color:var(--muted)}
+.task-queue{flex-shrink:0;max-height:50vh;overflow:auto;border-bottom:1px solid var(--line);background:var(--chrome);font-size:11px;color:var(--muted)}
 .task-queue summary{display:flex;align-items:center;gap:12px;padding:5px 16px;cursor:pointer}
+.task-queue>summary{position:sticky;top:0;z-index:2;background:var(--chrome);user-select:none}
+.task-queue>summary::before,.recovery-task>summary::before{content:'▸';color:var(--muted);flex:0 0 auto}
+.task-queue[open]>summary::before,.recovery-task[open]>summary::before{content:'▾'}
 .task-queue summary #queue-summary{flex:0 0 auto;color:var(--text)}
-.task-queue summary #active-task{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
 .task-detail{padding:5px 16px 4px;border-top:1px solid var(--line);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .task-module{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:7px 16px 5px;border-top:1px solid var(--line)}
 .task-module strong{font-weight:550;color:var(--text)}
 .task-module-actions{display:flex;flex-wrap:wrap;gap:6px}
-.task-module-error{flex-basis:100%;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--error)}
 .task-module+.task-detail{border-top:0}
 #rehost-status[data-state=error]{color:var(--error)}
-.task-queue .clear-tasks{float:right;margin-left:12px;padding:0 6px;font-size:11px}
-.queue-list{max-height:160px;overflow:auto;padding:0 16px 4px}
+.task-queue .clear-tasks{margin-left:auto;padding:0 6px;font-size:11px}
+.queue-list{padding:0 16px 4px}
 .queue-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-start;gap:4px 12px;padding:5px 0;border-top:1px solid var(--line)}
+.task-queue .queue-row{padding:7px 0}
+.task-insight{padding:4px 16px 10px;line-height:1.7}
+.recovery-task .task-insight{padding:2px 0 10px 18px}
+.task-activity{color:var(--text);white-space:pre-wrap;overflow-wrap:anywhere}
+.task-hint{color:var(--muted);margin:3px 0}
+.task-functions{display:grid;gap:4px;margin-top:6px}
+.task-function{display:flex;flex-wrap:wrap;gap:2px 12px;align-items:baseline}
+.task-function .queue-jump{color:var(--accent)}
+.task-reason{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--error)}
+.task-evidence{max-height:230px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font:11px/1.6 var(--mono);margin:6px 0}
+.task-queue .evidence-toggle>summary{padding:4px 0;display:list-item;list-style-position:inside}
+.rehost-checks{display:flex;flex-wrap:wrap;gap:4px 18px;margin:6px 0;color:var(--text)}
+.rehost-checks span[data-state=error]{color:var(--error)}
 .queue-label{min-width:0;max-width:100%;text-align:left;overflow-wrap:anywhere;color:var(--text)}
 .queue-status{max-width:100%;text-align:left;overflow-wrap:anywhere}
 .notes{padding:6px 16px;color:var(--muted)}
@@ -223,17 +222,17 @@ footer{height:22px;flex-shrink:0;display:flex;align-items:center;justify-content
 @media(max-width:800px){
   .topbar-main{padding:4px 12px;gap:14px}
   .sample{min-width:120px;flex-basis:240px}
-  .topbar-status{min-width:0}
   .columns,.function{font-size:10px}
   .code-note{display:none}
 }
 @media(max-width:520px){
   .topbar-main{flex-wrap:wrap;gap:6px 12px}
   .sample{flex:1;min-width:0}
-  .topbar-status{order:1;flex:1 0 100%;max-width:100%;margin-left:0}
   .task-queue summary{flex-wrap:wrap;gap:5px 10px}
-  .task-queue summary #active-task{flex-basis:50%}
-  .task-queue .clear-tasks{margin-left:0}
+  .task-queue>summary{flex-wrap:nowrap;gap:7px;padding:5px 10px}
+  .workflow-tabs{gap:2px;flex:1}
+  .workflow-step{flex:1;flex-direction:column;align-items:flex-start;gap:2px;padding:4px 6px}
+  .workflow-step span{max-width:100%}
   .layout{--sidebar-width:220px}
   .columns,.function{grid-template-columns:minmax(0,1fr) 44px}
   .columns .name-label{display:none}
@@ -252,9 +251,6 @@ footer{height:22px;flex-shrink:0;display:flex;align-items:center;justify-content
  <div class="topbar-main">
   <div class="brand">Light<span>RE</span><span class="version">0.2</span></div>
   <div class="sample"><div class="eyebrow">WORKSPACE</div><div id="sample-name" class="sample-name">正在打开工作区…</div></div>
-  <div id="analysis-status" class="topbar-status" role="status" aria-live="polite">
-    <div class="analysis-caption"><strong id="analysis-stage">正在读取分析进度…</strong><span id="analysis-time"></span></div>
-  </div>
   <div class="header-actions">
     <button id="theme-toggle" class="toolbar-button theme-toggle" aria-label="切换浅色或深色模式">
       <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg>
@@ -264,22 +260,42 @@ footer{height:22px;flex-shrink:0;display:flex;align-items:center;justify-content
 </div>
 </header>
 <details id="task-queue" class="task-queue">
-  <summary><span id="queue-summary">任务详情</span><span id="active-task" class="task-state" role="status" aria-live="polite">正在准备分析…</span><button id="clear-tasks" class="load-more clear-tasks" type="button" title="清除已结束任务及回复的展示；日志留档，保留源码和 Knowledge" disabled>清除已结束任务</button></summary>
+  <summary title="单击展开，双击收起；Enter 或空格切换展开状态">
+    <span id="queue-summary">任务详情</span>
+    <div class="workflow-tabs" role="tablist" aria-label="任务类型">
+      <button id="step-recovery" class="workflow-step" type="button" role="tab" aria-controls="recovery-task" aria-selected="true"><strong>Recovery</strong><span id="step-recovery-status" role="status" aria-live="polite">正在读取…</span></button>
+      <button id="step-rehost" class="workflow-step" type="button" role="tab" aria-controls="rehost-task" aria-selected="false" tabindex="-1"><strong>Rehost</strong><span id="step-rehost-status" role="status" aria-live="polite">正在读取…</span></button>
+    </div>
+  </summary>
+  <section id="recovery-task" role="tabpanel" aria-labelledby="step-recovery">
   <div id="recovery-controls" class="task-module" role="group" aria-label="Recovery 队列操作" hidden>
-    <strong>Recovery · 函数分析与修改建议</strong>
+    <strong>函数分析与修改建议</strong>
     <div class="task-module-actions">
       <button id="resume-recovery" class="load-more" type="button" hidden>恢复队列</button>
       <button id="stop-recovery" class="load-more" type="button" title="暂停 Recovery 函数分析与修改建议队列" hidden>暂停队列</button>
     </div>
+    <button id="clear-tasks" class="load-more clear-tasks" type="button" title="隐藏已结束的 Recovery 任务，保留源码与分析记录" disabled>清除已结束</button>
   </div>
   <div id="recovery-status" class="recovery-status task-detail" role="status" aria-live="polite">正在准备分析…</div>
-  <div id="analysis-progress" class="analysis-progress" aria-label="分析日志"><div id="analysis-log" hidden><div class="analysis-log-caption">查看分析日志</div><div class="analysis-log-body"><div id="analysis-bar" class="analysis-bar" data-mode="indeterminate" role="progressbar" aria-label="当前阶段进度"><div id="analysis-bar-fill" class="analysis-bar-fill"></div></div><pre id="analysis-log-text"></pre></div></div></div>
   <div id="queue-list" class="queue-list"></div>
-  <div id="rehost-task" class="task-module" hidden>
-    <strong>Rehost · 运行验证</strong>
-    <span id="rehost-status" role="status" aria-live="polite"></span>
-    <div id="rehost-error" class="task-module-error" hidden></div>
-  </div>
+  </section>
+  <section id="rehost-task" role="tabpanel" aria-labelledby="step-rehost" hidden>
+    <div class="task-module">
+      <strong>运行验证</strong>
+      <span id="rehost-status" role="status" aria-live="polite"></span>
+      <button id="retry-rehost" class="load-more" type="button" hidden>重试 Rehost</button>
+    </div>
+    <div class="task-insight">
+      <div id="rehost-activity" class="task-activity"></div>
+      <div id="rehost-checks" class="rehost-checks"></div>
+      <div id="rehost-entry" class="task-hint" hidden></div>
+      <div id="rehost-result" class="task-hint"></div>
+      <div id="rehost-error" class="task-reason" hidden></div>
+      <details id="rehost-output" class="evidence-toggle" hidden><summary>构建与运行输出</summary><pre id="rehost-output-text" class="task-evidence"></pre></details>
+      <details id="rehost-observation" class="evidence-toggle" hidden><summary>运行返回数据</summary><pre id="rehost-observation-text" class="task-evidence"></pre></details>
+      <details id="rehost-reply" class="evidence-toggle" hidden><summary>本轮处理说明</summary><pre id="rehost-reply-text" class="task-evidence"></pre></details>
+    </div>
+  </section>
 </details>
 <div class="layout">
   <aside id="sidebar" aria-label="函数导航">
@@ -297,7 +313,7 @@ footer{height:22px;flex-shrink:0;display:flex;align-items:center;justify-content
     </select>
     <div class="columns"><button class="column-sort" id="sort-rva" aria-label="按 RVA 排序" aria-pressed="false">RVA</button><span class="name-label">NAME</span><button class="column-sort" id="sort-lines" title="LINES：汇编指令行数，点击切换排序" aria-label="按汇编行数排序" aria-pressed="true">LINES ↓</button></div>
     <nav class="functions" id="functions" aria-label="已识别函数"><div class="list-empty">正在读取已保存的函数…</div></nav>
-    <div class="sidebar-foot" id="list-summary">读取工作区分析结果</div>
+    <div class="sidebar-foot" id="list-summary"></div>
   </aside>
   <div id="sidebar-resizer" class="sidebar-resizer" role="separator" aria-label="调整函数列表宽度" aria-orientation="vertical" aria-controls="sidebar" tabindex="0" title="拖动调整左栏宽度；双击恢复紧凑宽度；方向键微调"></div>
   <main>
@@ -332,10 +348,9 @@ footer{height:22px;flex-shrink:0;display:flex;align-items:center;justify-content
         </div>
         <section id="feedback-history" class="feedback-history" aria-label="当前函数的建议与回复" hidden></section>
         <div id="feedback-bar" class="feedback-bar">
-          <textarea id="feedback-comment" rows="1" placeholder="提出修改建议，例如重命名、调整类型或处理逻辑…" aria-label="函数修改建议" aria-describedby="feedback-hint"></textarea>
+          <textarea id="feedback-comment" rows="1" placeholder="修改建议（Enter 发送 · Shift+Enter 换行 · 任务进行中每 5 秒更新）" aria-label="函数修改建议"></textarea>
           <button id="submit-comment" class="load-more">提交修改建议</button>
           <span id="feedback-message" class="feedback-status" role="status" aria-live="polite"></span>
-          <span id="feedback-hint" class="feedback-hint">Enter 发送 · Shift+Enter 换行 · 建议进度和回复每 3 秒更新</span>
         </div>
       </section>
     </div>
@@ -349,6 +364,8 @@ const hex = n => '0x' + n.toString(16).padStart(8, '0');
 let functions = [], selected = null, loaded = 0, nextOffset = null, requestId = 0, controller, busy = false;
 let sampleState = 'new', refreshTimer, loadFailed = false;
 let workspaceReady = false, statusTimer, serviceState = {}, recoveryProgress = null;
+let retryingRehost = false;
+let workflowFocus = 'recovery';
 let sortBy = 'lines', sortDescending = true;
 const viewModes = ['assembly', 'candidate', 'split'];
 let savedView;
@@ -366,7 +383,12 @@ const statusLabels = {failed:'CLI 执行失败，尚无模型结果；可继续�
 const statusSymbols = {failed:'!', llm:'✓', unresolved:'?', running:'◌', queued:'↥', ghidra:'G', pending:'·', unknown:'·'};
 const rehostLabels = {waiting_for_recovery: 'Rehost 等待 Recovery', running: 'Rehost 正在生成和运行 harness',
   complete: 'Rehost 本轮验证完成', observed: 'Rehost 已记录运行观察（未经等价验证）',
-  limited: 'Rehost 本轮达到限制', cancelled: 'Rehost 已取消', error: 'Rehost 执行失败'};
+  limit: 'Rehost 本轮达到限制', limited: 'Rehost 本轮达到限制', cancelled: 'Rehost 已取消', error: 'Rehost 执行失败',
+  starting: 'Rehost 正在准备', waiting_for_writer: 'Rehost 等待工作区写入任务结束',
+  interrupted: 'Rehost 执行已中断', not_started: 'Rehost 尚未启动'};
+const rehostPhases = {starting:'准备任务', checking:'检查 harness 和固定用例', preparing:'准备运行输入',
+  checking_environment:'检查 Java / Maven 环境', repairing:'LLM 正在生成或修复 harness',
+  building:'编译 harness', executing:'unidbg 正在运行目标入口', validating:'检查返回结果与固定期望'};
 function renderFunctionCount() {
   const candidates = recoveryProgress?.candidates;
   $('function-count').textContent = `${functions.length} 已识别` + (candidates == null ? '' : ` · LLM ${candidates}`);
@@ -819,68 +841,149 @@ async function refreshFeedback() {
   }
 }
 
+function recoveryTaskName(task) {
+  return 'Recovery / ' + ({comment: '修改建议', targeted: '定向分析', initial: '函数分析'}[task.mode] || '函数分析');
+}
+
+function recoveryTaskDetail(task) {
+  const targets = task.current?.length ? task.current : task.rvas?.length === 1 ? task.rvas : [];
+  const names = targets.slice(0, 2).map(value => {
+    const rva = Number(value), fn = functions.find(item => item.rva === rva);
+    const name = fn?.source_name || fn?.name;
+    return name ? `${name}（${hex(rva)}）` : hex(rva);
+  });
+  const target = names.join('、') + (targets.length > 2 ? ` 等 ${targets.length} 个函数` : '');
+  return [target, task.mode === 'comment' && task.comment ? `建议：${task.comment}` : '',
+    `已处理 ${task.processed || 0}/${task.total ?? 0}`].filter(Boolean).join(' · ');
+}
+
+function rehostActivity(task) {
+  return [task.round ? `第 ${task.round} 轮` : '首次检查', rehostPhases[task.phase] || '正在生成、运行或修复 harness',
+    task.verification?.current_case && !['repairing','starting'].includes(task.phase) ? `用例 ${task.verification.current_case}` : '',
+    task.phase_elapsed_seconds != null ? `当前步骤 ${task.phase_elapsed_seconds} 秒` : ''].filter(Boolean).join(' · ');
+}
+
+function setTaskEvidence(id, text) {
+  $(id).hidden = !text;
+  if ($(id + '-text').textContent !== text) $(id + '-text').textContent = text;
+}
+
+function renderRehost(task) {
+  $('rehost-task').hidden = !serviceState.ready || !task || workflowFocus === 'recovery';
+  if (!task) return;
+  const busy = ['starting','running','waiting_for_recovery','waiting_for_writer'].includes(task.status);
+  $('rehost-status').textContent = task.status === 'observed' ? '已返回（观察模式）' : (rehostLabels[task.status] || task.status).replace(/^Rehost\s*/, '');
+  $('rehost-status').dataset.state = task.status;
+  const retry = $('retry-rehost');
+  retry.hidden = task.can_retry === false || busy;
+  retry.disabled = retryingRehost;
+  retry.textContent = retryingRehost ? '正在提交…' : ['complete','observed'].includes(task.status) ? '重新验证' : task.status === 'not_started' ? '启动 Rehost' : '重试 Rehost';
+  retry.title = '复用已有 harness、固定用例和轮次记录，重新构建、运行并检查；失败时继续修复';
+  $('rehost-activity').textContent = ['starting','running'].includes(task.status) ? rehostActivity(task) :
+    task.status === 'waiting_for_recovery' ? '等待 Recovery 完成排队任务后运行' :
+    task.status === 'waiting_for_writer' ? '等待其他任务释放工作区写锁' : task.id ? `任务 ${task.id} · 已执行 ${task.round || 0} 轮修复` : '';
+  const run = task.run, checks = document.createDocumentFragment();
+  const check = (text, error = false) => {
+    const item = document.createElement('span'); item.textContent = text;
+    if (error) item.dataset.state = 'error';
+    checks.append(item);
+  };
+  const previousCheck = busy && (['repairing','starting'].includes(task.phase) || ['waiting_for_recovery','waiting_for_writer'].includes(task.status));
+  if (run) {
+    if (previousCheck) check('最近一次检查：');
+    const build = run.build || {}, execution = run.execution || {};
+    check(build.status === 'running' ? '编译中' : build.status === 'exited' && build.exit_code === 0 ? '编译通过' :
+      build.status ? `编译未成功 · ${build.status}${build.exit_code != null ? ` · 退出码 ${build.exit_code}` : ''}` : '尚无编译结果',
+      Boolean(build.status && build.status !== 'running' && !(build.status === 'exited' && build.exit_code === 0)));
+    check(execution.status === 'running' ? 'unidbg 运行中' : execution.status === 'exited' && execution.exit_code === 0 ? 'Java 进程正常退出' :
+      execution.status ? `运行未成功 · ${execution.status}${execution.exit_code != null ? ` · 退出码 ${execution.exit_code}` : ''}` : '尚无执行结果',
+      Boolean(execution.status && execution.status !== 'running' && !(execution.status === 'exited' && execution.exit_code === 0)));
+    check(run.native_returned === true ? `harness 报告 native 已返回 · ${run.native_calls} 次调用` : '尚未确认 native 调用返回');
+    if (execution.stderr) check('运行 stderr 有输出，可展开查看');
+    if (Array.isArray(run.missing_environment) && run.missing_environment.length) check(`环境缺失 ${run.missing_environment.length} 项`, true);
+    if (task.verification?.total_cases != null) check(`固定用例已执行 ${task.completed_cases || 0}/${task.verification.total_cases}`);
+  }
+  $('rehost-checks').replaceChildren(checks);
+  $('rehost-entry').textContent = run?.entry ? `目标入口：${run.entry}` : '';
+  $('rehost-entry').hidden = !run?.entry;
+  const runLabels = {running:'执行中', passed:'通过固定期望检查', observed:'仅记录运行观察',
+    build_failed:'编译失败', execution_failed:'运行失败', mismatch:'返回结果或运行条件不符合要求',
+    observation_failed:'未得到有效返回数据', error:'运行准备失败', interrupted:'执行已中断', cancelled:'已取消'};
+  const result = task.verification?.status === 'passed' ? '全部固定用例通过独立期望检查。' :
+    task.verification?.status === 'observed' || task.status === 'observed' ? '固定用例运行结束；当前仅记录运行观察，尚无独立期望用于等价验证。' :
+    run ? `最近一次检查：${runLabels[run.status] || run.status || '运行中'}${task.phase === 'repairing' && busy ? ' · 正根据结果修复 harness' : ''}` : '';
+  $('rehost-result').textContent = (previousCheck && result ? '上一次检查结果：' : '') + result;
+  const errors = [...new Set([task.error, task.verification?.error, run?.error, ...(run?.differences || [])].filter(Boolean))];
+  $('rehost-error').textContent = errors.join('\n'); $('rehost-error').hidden = !errors.length;
+  const output = run ? [['编译 stdout',run.build?.stdout],['编译 stderr',run.build?.stderr],
+    ['运行 stdout',run.execution?.stdout],['运行 stderr',run.execution?.stderr]].filter(([,value])=>value).map(([name,value])=>`${name}\n${value}`).join('\n\n') : '';
+  setTaskEvidence('rehost-output', output);
+  setTaskEvidence('rehost-observation', run?.observation || '');
+  setTaskEvidence('rehost-reply', task.reply || '');
+}
+
+async function retryRehost() {
+  if (retryingRehost) return;
+  retryingRehost = true; renderRehost(serviceState.workflow?.rehost);
+  let failure;
+  try { await postJSON('/api/rehost/retry'); await refreshStatus(); }
+  catch (error) { failure = error.message; }
+  finally {
+    retryingRehost = false; renderRehost(serviceState.workflow?.rehost);
+    if (failure) { $('rehost-error').textContent = failure; $('rehost-error').hidden = false; }
+  }
+}
+
+function showWorkflowStep(name) {
+  if ($('step-' + name).disabled) return;
+  workflowFocus = name; $('task-queue').open = true;
+  renderWorkflowPanels();
+}
+
+function renderWorkflowPanels() {
+  $('recovery-task').hidden = workflowFocus !== 'recovery';
+  $('rehost-task').hidden = !serviceState.ready || !serviceState.workflow?.rehost || workflowFocus !== 'rehost';
+  for (const name of ['recovery','rehost']) {
+    $('step-' + name).setAttribute('aria-selected', String(workflowFocus === name));
+    $('step-' + name).tabIndex = workflowFocus === name ? 0 : -1;
+  }
+}
+
 function renderServiceProgress() {
   const data = serviceState, workflow = data.workflow, recovery = recoveryProgress;
   const rehost = workflow?.rehost;
-  $('rehost-task').hidden = !data.ready || !rehost;
-  $('rehost-status').textContent = rehost ? rehostLabels[rehost.status] || `Rehost · ${rehost.status}` : '';
-  $('rehost-status').dataset.state = rehost?.status || '';
-  $('rehost-error').textContent = rehost?.error || '';
-  $('rehost-error').hidden = !rehost?.error;
-  let label = data.message || '分析工作区已就绪', detail = '探索目录 → Ghidra 静态分析 → Recovery → Rehost';
-  let error = data.error, active = !data.ready || data.phase === 'recovery_starting', count = null;
-  let summary = !data.ready && data.phase_elapsed_seconds != null ? `当前阶段已用 ${data.phase_elapsed_seconds} 秒` : '';
-  if (data.ready && !error && recovery) {
-    const jobs = recovery.queue || [];
-    const task = jobs.find(job => job.status === 'running') || jobs.find(job => job.status === 'queued') || recovery.task;
-    summary = `LLM 已处理 ${recovery.candidates}/${recovery.total} 个函数` +
-      (recovery.unresolved ? ` · 未解决 ${recovery.unresolved}` : '') +
-      (recovery.failed ? ` · 执行失败 ${recovery.failed}` : '');
-    detail = $('recovery-status').textContent;
-    active = !recovery.paused && ['queued', 'running'].includes(task.status);
-    if (active) {
-      const mode = {comment: '处理修改建议', targeted: '定向分析', initial: '首轮分析'}[task.mode] || 'Recovery';
-      label = `${mode} · ${task.status === 'queued' ? '等待执行' : `已处理 ${task.processed || 0}/${task.total || recovery.total}`}`;
-      count = {value: task.processed || 0, total: task.total || recovery.total};
-    } else if (recovery.paused && !['running', 'error'].includes(rehost?.status)) {
-      label = 'Recovery 队列已暂停';
-    } else if (rehost) {
-      label = rehostLabels[rehost.status] || `Rehost · ${rehost.status}`;
-      active = ['waiting_for_recovery', 'running'].includes(rehost.status);
-      error = rehost.error;
-    } else {
-      const labels = {complete: 'Recovery 本轮完成', partial: 'Recovery 有未解决项', error: 'Recovery 执行失败',
-        interrupted: 'Recovery 队列已中断', cancelled: 'Recovery 已取消', idle: '暂无执行中的任务'};
-      label = labels[task.status] || 'Recovery 等待任务';
-      error = task.error;
-    }
-    if (recovery.queued) summary += ` · 排队 ${recovery.queued}`;
-  }
-  if (data.error) label = '分析启动失败';
-  $('analysis-stage').textContent = label;
-  $('analysis-time').textContent = summary;
-  $('analysis-status').dataset.state = error ? 'error' : active ? 'running' : 'ready';
-  $('analysis-status').title = [label, summary, error].filter(Boolean).join('\n');
-  $('analysis-progress').hidden = false;
-  $('analysis-progress').dataset.state = error ? 'error' : active ? 'running' : 'ready';
-  $('active-task').textContent = label;
-  $('recovery-status').textContent = data.ready && recovery ? detail : error || detail;
-  const bar = $('analysis-bar');
-  bar.hidden = !active || !!error;
-  if (count && count.total > 0) {
-    bar.dataset.mode = 'determinate';
-    $('analysis-bar-fill').style.width = `${Math.min(100, Math.max(0, count.value / count.total * 100))}%`;
-    bar.setAttribute('aria-valuemin', '0'); bar.setAttribute('aria-valuemax', String(count.total));
-    bar.setAttribute('aria-valuenow', String(count.value));
-  } else {
-    bar.dataset.mode = 'indeterminate';
-    $('analysis-bar-fill').style.width = '35%';
-    bar.removeAttribute('aria-valuenow');
-  }
-  const staticActive = !data.ready && active;
-  $('analysis-log').hidden = !staticActive && !data.log_path && !data.error;
-  $('analysis-log-text').textContent = data.log_path ? `${data.log_path}\n${data.log_tail || '等待 Ghidra 写入日志…'}` :
-    (staticActive ? '等待静态分析日志路径…' : data.error || '');
+  renderRehost(rehost);
+  const jobs = recovery?.queue?.length ? recovery.queue : recovery?.task ? [recovery.task] : [];
+  const running = recovery?.paused ? [] : jobs.filter(job => job.status === 'running');
+  const queued = jobs.filter(job => job.status === 'queued');
+  const rehostRunning = ['starting','running'].includes(rehost?.status);
+  const current = running[0];
+  const interrupted = jobs.some(job => job.status === 'interrupted');
+  const remaining = recovery ? Math.max(0, recovery.total - recovery.candidates) : 0;
+  const issues = [recovery?.unresolved ? `未解决 ${recovery.unresolved}` : '',
+    recovery?.failed ? `执行失败 ${recovery.failed}` : ''].filter(Boolean).join(' · ');
+  $('step-recovery-status').textContent = !data.ready ? data.error ? '准备失败' : '准备工作区' : current ?
+    `${recoveryTaskName(current).replace('Recovery / ','')} · ${current.processed || 0}/${current.total}` :
+    recovery?.paused ? '队列已暂停' : interrupted ? '队列已中断' : queued.length ? `等待 ${queued.length} 项任务` :
+    issues || (jobs.some(job => job.status === 'error') ? '任务执行失败' : remaining ? `待处理 ${remaining} 个函数` :
+    recovery ? `LLM 已处理 ${recovery.candidates}/${recovery.total}` : '读取任务中…');
+  $('step-recovery').dataset.state = data.error ? 'error' : current ? 'running' :
+    interrupted || recovery?.failed || jobs.some(job => job.status === 'error') ? 'error' : 'idle';
+  $('step-recovery').title = current ? [recoveryTaskName(current), recoveryTaskDetail(current), current.activity?.label, current.activity?.detail].filter(Boolean).join('\n') :
+    data.error || (!data.ready ? data.message : '') || [recovery ? `LLM 已处理 ${recovery.candidates}/${recovery.total} 个函数，候选仍需运行验证` : '',
+      issues, remaining ? `待处理 ${remaining} 个函数` : '', '查看函数分析、修改建议和未解决原因'].filter(Boolean).join('\n');
+  const shortPhase = {starting:'准备中', checking:'检查中', preparing:'准备输入', checking_environment:'检查环境',
+    repairing:'LLM 修复中', building:'编译中', executing:'运行中', validating:'验证中'};
+  $('step-rehost-status').textContent = !data.ready ? '等待工作区' : rehostRunning ?
+    [rehost.round ? `第 ${rehost.round} 轮` : '', shortPhase[rehost.phase] || '运行中'].filter(Boolean).join(' · ') :
+    rehost?.status === 'observed' ? '已返回 · 待等价验证' : rehost?.status === 'complete' ? '验证通过 · 待差分逆向' :
+    (rehostLabels[rehost?.status] || '尚未启动').replace(/^Rehost\s*/, '');
+  $('step-rehost').dataset.state = rehostRunning ? 'running' : ['error','interrupted','limit','limited'].includes(rehost?.status) ? 'error' : 'idle';
+  $('step-rehost').disabled = !data.ready;
+  $('step-rehost').title = [rehost ? rehostLabels[rehost.status] : '查看运行验证', rehostRunning ? rehostActivity(rehost) : '',
+    ['observed','complete'].includes(rehost?.status) ? '整体分析尚未完成；差分测试逆向阶段尚未接入' : '', rehost?.error].filter(Boolean).join('\n');
+  if (!data.ready) $('recovery-status').textContent = data.error || data.message || '正在准备工作区';
+  renderWorkflowPanels();
 }
 
 async function refreshStatus() {
@@ -905,21 +1008,24 @@ async function refreshStatus() {
       if (serviceState.directory || serviceState.workspace) $('workspace').textContent = serviceState.directory || serviceState.workspace;
     }
   } catch (error) {
-    $('analysis-stage').textContent = '分析进度连接失败，正在重试';
-    $('analysis-status').dataset.state = 'error';
-    $('analysis-status').title = error.message;
-    $('active-task').textContent = '分析进度连接失败，正在重试';
+    for (const name of ['recovery','rehost']) {
+      $('step-' + name + '-status').textContent = '状态读取失败，重试中';
+      $('step-' + name).dataset.state = 'error'; $('step-' + name).title = error.message;
+    }
     $('recovery-status').textContent = error.message;
   }
-  statusTimer = setTimeout(refreshStatus, serviceState.ready ? 5000 : 2000);
+  const rehostActive = ['starting','running','waiting_for_recovery','waiting_for_writer'].includes(serviceState.workflow?.rehost?.status);
+  statusTimer = setTimeout(refreshStatus, !serviceState.ready ? 2000 : rehostActive ? 3000 : 15000);
 }
 
 async function refreshRecovery() {
   clearTimeout(recoveryTimer);
   if (!workspaceReady) return;
+  let recoveryRunning = false;
   try {
     const data = await getJSON('/api/recovery'), task = data.task;
     const running = !data.paused && ['queued','running'].includes(task.status);
+    recoveryRunning = running;
     const labels = {idle:'空闲', queued:'排队中', running:'分析中', complete:'本轮完成', partial:'有未解决函数', error:'分析出错', interrupted:'已暂停', cancelled:'已取消'};
     const phases = {ghidra:'Ghidra 分析中', source:'整理模块与初稿'};
     const concurrency = data.concurrency || {in_use:task.active_batches || 0, limit:task.effective_workers || task.workers};
@@ -966,8 +1072,10 @@ async function refreshRecovery() {
     candidateTaskWasActive = selectedTaskActive;
   } catch (error) {
     $('recovery-status').textContent = '进度读取失败'; $('recovery-status').title = error.message;
+    $('step-recovery-status').textContent = '进度读取失败，重试中';
+    $('step-recovery').dataset.state = 'error'; $('step-recovery').title = error.message;
   }
-  recoveryTimer = setTimeout(refreshRecovery, 5000);
+  recoveryTimer = setTimeout(refreshRecovery, recoveryRunning ? 5000 : 15000);
 }
 
 function renderRecoveryControls(data) {
@@ -1021,66 +1129,64 @@ async function selectTaskFunction(rva, showIssue = false) {
 function renderQueue(data) {
   const jobs = data.queue || [];
   $('clear-tasks').disabled = clearingTaskHistory.has('all') || !jobs.some(job => ['complete','partial','error','cancelled'].includes(job.status));
-  const expanded = new Map(Array.from($('queue-list').querySelectorAll('.queue-functions'))
-    .filter(item => !item.hidden).map(item => [item.dataset.taskId, item.dataset.scope]));
+  const expanded = new Set(Array.from($('queue-list').querySelectorAll('.recovery-task[open]')).map(item => item.dataset.taskId));
   const pending = jobs.filter(job => ['queued','running','interrupted'].includes(job.status));
-  const runningCount = jobs.filter(job => job.status === 'running').length;
-  $('queue-summary').textContent = '任务详情' + (runningCount ? ` · 执行中 ${runningCount}` : '') +
-    (data.queued ? ` · 等待 ${data.queued}` : '') + (data.paused ? ' · 已暂停' : '');
   const states = {queued:'等待', running:'执行中', interrupted:'已暂停', complete:'完成', partial:'有未解决项', error:'失败', cancelled:'已取消'};
   const recent = jobs.filter(job => !pending.includes(job)).sort((a,b) => b.created_at-a.created_at).slice(0, 5);
   const fragment = document.createDocumentFragment();
   for (const job of [...pending, ...recent]) {
-    const entry = document.createElement('div');
-    const row = document.createElement('div'); row.className = 'queue-row';
+    const entry = document.createElement('details'); entry.className = 'recovery-task';
+    entry.dataset.taskId = job.id; entry.open = expanded.has(job.id);
+    const row = document.createElement('summary'); row.className = 'queue-row';
     const rvas = [...new Set(job.rvas || [])].filter(rva => functions.some(fn => fn.rva === rva));
     const issues = new Map((job.issues || []).map(item => [item.rva, item]));
-    const issueRvas = rvas.filter(rva => issues.has(rva));
-    const chooser = document.createElement('div'); chooser.className = 'queue-functions'; chooser.hidden = true;
-    chooser.dataset.taskId = job.id;
-    const navigate = (targets, showIssue) => {
-      if (targets.length === 1) { selectTaskFunction(targets[0], showIssue); return; }
-      const key = JSON.stringify(targets), open = chooser.hidden || chooser.dataset.targets !== key;
-      chooser.hidden = !open; chooser.dataset.targets = key;
-      chooser.dataset.scope = showIssue ? 'issues' : 'all';
-      if (!open) return;
-      chooser.replaceChildren(...targets.map(rva => {
-        const button = document.createElement('button'); button.className = 'queue-jump'; button.type = 'button';
-        const issue = issues.get(rva);
-        button.dataset.rva = String(rva);
-        button.textContent = hex(rva) + (issue ? issue.status === 'failed' ? ' · 执行失败' : ' · 未解决' : '');
-        button.title = issue?.reason || functions.find(fn => fn.rva === rva).name;
-        button.onclick = () => selectTaskFunction(rva, Boolean(issue));
-        return button;
-      }));
-    };
-    const label = document.createElement(rvas.length ? 'button' : 'span'); label.className = 'queue-label';
-    if (rvas.length) { label.classList.add('queue-jump'); label.onclick = () => navigate(rvas, false); }
+    const label = document.createElement('span'); label.className = 'queue-label';
     label.textContent = (job.mode === 'comment' ? `评论 ${hex(job.rvas[0])} · ${job.comment}` :
-      `${job.mode === 'targeted' ? '定向分析' : '首轮分析'} · ${job.total} 个入口`);
-    label.title = `${job.id}\n${job.directory}\n${job.comment || ''}`;
-    const targets = job.issues?.length ? issueRvas : rvas;
-    const status = document.createElement(targets.length ? 'button' : 'span');
+      `${job.mode === 'targeted' ? '定向分析' : '函数分析'} · ${job.total} 个函数`);
+    row.title = '展开查看任务活动、处理结果和相关函数';
+    const status = document.createElement('span');
     status.className = 'queue-status';
     status.textContent = `${states[job.status] || job.status} · ${job.processed || 0}/${job.total}${(job.changed !== undefined || job.unchanged !== undefined) ? ` · 代码改进 ${job.changed || 0} · 保留 ${job.unchanged || 0}` : ''}${job.failed_count ? ` · 执行失败 ${job.failed_count}` : ''}`;
-    if (targets.length) {
-      status.classList.add('queue-jump');
-      status.title = targets.length === 1 ? `查看函数 ${hex(targets[0])} 及分析记录` : '展开相关函数，按 RVA 选择';
-      status.onclick = () => navigate(targets, true);
-    }
-    const restored = expanded.get(job.id) === 'issues' ? targets : rvas;
-    if (expanded.has(job.id) && restored.length > 1) navigate(restored, expanded.get(job.id) === 'issues');
     row.append(label, status);
     if (['queued','running','interrupted'].includes(job.status)) {
       const cancel = document.createElement('button'); cancel.className = 'load-more'; cancel.textContent = '取消';
-      cancel.onclick = async () => {
+      cancel.onclick = async event => {
+        event.preventDefault(); event.stopPropagation();
         cancel.disabled = true;
         try { await postJSON(`/api/tasks/${job.id}/cancel`); await refreshRecovery(); }
         catch (error) { $('recovery-status').textContent = error.message; cancel.disabled = false; }
       };
       row.append(cancel);
     }
-    entry.append(row, chooser); fragment.append(entry);
+    const content = document.createElement('div'); content.className = 'task-insight';
+    const fill = () => {
+      if (!entry.open || content.childNodes.length) return;
+      const add = (text, className) => { const el = document.createElement('div'); el.className = className; el.textContent = text; content.append(el); };
+      const activity = job.activity;
+      add(activity ? [activity.label, activity.detail, activity.silent_seconds >= 15 ? `${activity.silent_seconds} 秒未产生新活动` : ''].filter(Boolean).join(' · ') :
+        job.status === 'running' ? recoveryTaskDetail(job) : job.status === 'queued' ? '等待 Recovery 调度执行' : `本任务${states[job.status] || job.status}`, 'task-activity');
+      if (job.elapsed_seconds != null) add(`执行用时 ${job.elapsed_seconds} 秒`, 'task-hint');
+      if (job.error) add(job.error, 'task-reason');
+      add('点击函数查看源码、修改建议及分析上下文；未解决和失败项优先显示。', 'task-hint');
+      const list = document.createElement('div'); list.className = 'task-functions';
+      const current = new Set((job.current || []).map(Number)), done = new Set(job.done_rvas || []);
+      for (const rva of [...rvas].sort((a,b) => Number(issues.has(b))-Number(issues.has(a)) || Number(current.has(b))-Number(current.has(a)))) {
+        const fn = functions.find(item => item.rva === rva), issue = issues.get(rva);
+        const item = document.createElement('div'); item.className = 'task-function';
+        const button = document.createElement('button'); button.type = 'button'; button.className = 'queue-jump'; button.dataset.rva = String(rva);
+        button.textContent = `${fn.source_name || fn.name} · ${hex(rva)}`;
+        button.onclick = () => selectTaskFunction(rva, Boolean(issue));
+        const state = document.createElement('span');
+        state.textContent = issue ? issue.status === 'failed' ? '执行失败' : '未解决' : current.has(rva) && job.status === 'running' ? '正在处理' :
+          done.has(rva) || job.processed >= job.total ? '已处理' : '待处理';
+        item.append(button, state);
+        if (issue?.reason) { const reason = document.createElement('span'); reason.className = 'task-reason'; reason.textContent = issue.reason; item.append(reason); }
+        list.append(item);
+      }
+      content.append(list);
+    };
+    entry.addEventListener('toggle', fill); fill();
+    entry.append(row, content); fragment.append(entry);
   }
   if (!jobs.length) fragment.append(document.createTextNode('暂无任务'));
   $('queue-list').replaceChildren(fragment);
@@ -1113,8 +1219,7 @@ function renderList() {
     empty.textContent = query || filter !== 'all' ? '没有匹配的函数。可调整搜索或状态筛选。' : sampleState === 'ready' ? '当前没有已保存的函数。' : '正在读取函数…'; fragment.append(empty);
   }
   $('functions').replaceChildren(fragment);
-  $('list-summary').textContent = query || filter !== 'all' ? `${visible.length} / ${functions.length} 个匹配` :
-    `按${sortBy === 'lines' ? '行数' : ' RVA '}${sortDescending ? '降序' : '升序'} · 每条指令计一行`;
+  $('list-summary').textContent = query || filter !== 'all' ? `${visible.length} / ${functions.length} 个匹配` : '';
 }
 
 function renderInstruction(op) {
@@ -1235,6 +1340,33 @@ $('cancel-suggestion').onclick = cancelCurrentSuggestion;
 $('reanalyze-function').onclick = reanalyzeFunction;
 $('resume-recovery').onclick = () => controlRecovery();
 $('stop-recovery').onclick = () => controlRecovery(true);
+$('retry-rehost').onclick = retryRehost;
+for (const name of ['recovery','rehost']) {
+  $('step-' + name).onclick = event => {
+    event.preventDefault(); event.stopPropagation();
+    if (event.detail <= 1) showWorkflowStep(name);
+  };
+}
+const taskBar = $('task-queue').querySelector(':scope > summary');
+taskBar.addEventListener('click', event => {
+  event.preventDefault();
+  // Pointer clicks expand; keyboard activation retains the usual toggle.
+  if (event.detail <= 1) $('task-queue').open = event.detail === 0 ? !$('task-queue').open : true;
+});
+taskBar.addEventListener('dblclick', event => {
+  event.preventDefault();
+  $('task-queue').open = false;
+});
+$('task-queue').addEventListener('toggle', renderWorkflowPanels);
+$('task-queue').querySelector('[role=tablist]').addEventListener('keydown', event => {
+  if (!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return;
+  event.preventDefault(); event.stopPropagation();
+  const tabs = ['recovery','rehost'].filter(name => !$('step-' + name).disabled);
+  const current = event.target.closest('[role=tab]')?.id.replace('step-', '') || workflowFocus;
+  const index = tabs.indexOf(current);
+  const next = event.key === 'Home' ? tabs[0] : event.key === 'End' ? tabs.at(-1) : tabs[(index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length];
+  showWorkflowStep(next); $('step-' + next).focus();
+});
 $('search').addEventListener('input', renderList);
 $('status-filter').addEventListener('change', renderList);
 $('sort-rva').onclick = () => setSort('rva');

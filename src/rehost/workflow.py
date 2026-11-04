@@ -52,11 +52,23 @@ def _protected_sections(task):
 
 
 def _check_immutable(task):
-    """校验受保护输入（任务、契约、SO、执行器代码）自任务创建后未被改动。"""
+    """恢复时校验全部受保护内容自任务创建后未被改动（执行器由 _accept_executor_update 先重置）。"""
     for section in _protected_sections(task):
         for filename, sha in section.items():
             if digest(filename) != sha:
                 raise RuntimeError(f'Fixed task/checker input changed: {filename}')
+
+
+def _check_inputs(task):
+    """运行中校验只针对任务输入（任务、契约、SO、用例）。
+
+    执行器代码不参与运行中校验：验证器用的就是当前工具代码，工具在任务运行期间
+    升级（并行开发）不影响 harness 对契约的验证；恢复时才统一重置执行器基线。
+    """
+    inputs, _ = _protected_sections(task)
+    for filename, sha in inputs.items():
+        if digest(filename) != sha:
+            raise RuntimeError(f'Fixed task/checker input changed: {filename}')
 
 
 def _accept_executor_update(task):
@@ -64,6 +76,9 @@ def _accept_executor_update(task):
     inputs, executor = _protected_sections(task)
     executor = {filename: digest(filename) for filename in executor
                 if Path(filename).exists()}  # 重构可能删除模块文件。
+    # 旧任务可能把模块代码错存进输入区：归位到执行器区，恢复才能接受升级。
+    inputs = {filename: sha for filename, sha in inputs.items()
+              if not filename.startswith(str(EXECUTOR))}
     write_json(task / 'protected.json', {'inputs': inputs, 'executor': executor})
 
 
@@ -104,7 +119,9 @@ def _new_task(directory, harness, parameters, description, workflow=None):
                         Path(contract['binary']['path']), *map(Path, baseline),
                         *verification.iterdir()])
     config = read_json(directory / 'harness.json')
-    input_paths.extend((directory / path).resolve() for path in config.get('protected_files', []))
+    # 模块代码属于执行器区（可升级），不从关联的 protected_files 混入任务输入区。
+    input_paths.extend((directory / path).resolve() for path in config.get('protected_files', [])
+                       if not str((directory / path).resolve()).startswith(str(EXECUTOR)))
     write_json(task / 'protected.json', {
         'inputs': {str(path): digest(path) for path in input_paths},
         'executor': {str(path): digest(path) for path in executor_paths},
@@ -155,7 +172,8 @@ def run_rounds(directory, *, task=None, description=None,
             # A deliberate resume consumes the old cancellation request.
             (task / 'cancel').unlink(missing_ok=True)
         stop = lambda: cancelled() or (task / 'cancel').exists()
-        state.update(status='running', pid=os.getpid(), stopped_reason=None)
+        state.update(status='running', pid=os.getpid(), stopped_reason=None,
+                     run_started_at=time.time(), phase='starting', phase_started_at=time.time())
         write_json(task / 'state.json', state)
         try:
             _round_loop(directory, harness, task, state, max_rounds, timeout, stop, fds, workflow,
@@ -181,7 +199,7 @@ def _check_harness(directory, harness, task, destination, cancelled, timeout, fd
     report = {'status': 'checking', 'passed': False, 'runs': [], 'started_at': time.time()}
     write_json(destination / 'verification.json', report)
     try:
-        _check_immutable(task)
+        _check_inputs(task)
         contract = read_json(task / 'contract.json')
         if target_info(directory) != contract['binary']:
             raise RuntimeError('Task target no longer matches fixed SO')
@@ -192,13 +210,20 @@ def _check_harness(directory, harness, task, destination, cancelled, timeout, fd
                 raise
             report.update(status='harness_incomplete', error=str(error))
             return report
+        report['total_cases'] = len(contract['cases'])
         for case in contract['cases']:
             if cancelled():
                 report['status'] = 'cancelled'
                 break
+            report['current_case'] = case['id']
+            def on_progress(current):
+                report['current_run'] = current['run']
+                write_json(destination / 'verification.json', report)
             current = run(directory, case['request'], timeout=timeout,
-                          cancelled=cancelled, _lock_fds=fds, _update_guide=False)
+                          cancelled=cancelled, _lock_fds=fds, _update_guide=False,
+                          on_progress=on_progress)
             report['runs'].append(current)
+            write_json(destination / 'verification.json', report)
             if current.get('expected') != case['expected']:
                 raise RuntimeError('Fixed expected results no longer match checker')
             if not current['passed'] and not current.get('observed'):
@@ -208,7 +233,7 @@ def _check_harness(directory, harness, task, destination, cancelled, timeout, fd
             observed = all(item.get('observed') for item in report['runs'])
             report.update(status='observed' if observed else 'passed', passed=not observed,
                           observed=observed)
-        _check_immutable(task)
+        _check_inputs(task)
         if source_files(harness) != before:
             raise RuntimeError('Editable harness changed during verification')
         record_check(harness, report, destination / 'verification.json')
@@ -219,6 +244,13 @@ def _check_harness(directory, harness, task, destination, cancelled, timeout, fd
         report['finished_at'] = time.time()
         write_json(destination / 'verification.json', report)
     return report
+
+
+def _java_sources(files):
+    """剔除指南文件，只保留 Java 工程实质内容（pom.xml 与 src/）。"""
+    if files is None:
+        return None
+    return {name: sha for name, sha in files.items() if name != 'HARNESS.md'}
 
 
 def _conclude(state, verification, rounds, min_rounds):
@@ -241,6 +273,9 @@ def _round_loop(directory, harness, task, state, max_rounds, timeout, stop, fds,
                 bootstrap=False, min_rounds=0):
     """验证→（未过则）agent 修改→再验证的循环；退出判定统一走 _conclude()。"""
     check = task / ('check-' + identifier())
+    state.update(phase='checking', phase_started_at=time.time(),
+                 latest_verification=str(check / 'verification.json'))
+    write_json(task / 'state.json', state)
     verification = _check_harness(directory, harness, task, check, stop, timeout, fds, bootstrap)
     state['latest_verification'] = str(check / 'verification.json')
     failures = 0
@@ -260,6 +295,10 @@ def _round_loop(directory, harness, task, state, max_rounds, timeout, stop, fds,
             state['round'] += 1
             current = task / f'round-{state["round"]:04d}'
         current.mkdir()  # Never reuse a previous attempt's result or logs.
+        try:
+            files_at_round_start = source_files(harness)
+        except (OSError, ValueError):
+            files_at_round_start = None  # 工程还没有 Java 源码。
         previous = state.get('latest_round')
         prompt = Path(workflow or PROMPT).read_text(encoding='utf-8') + render_prompt(
             PROMPT.with_name('ROUND.md'), HARNESS=harness, GUIDE=harness / 'HARNESS.md',
@@ -272,7 +311,8 @@ def _round_loop(directory, harness, task, state, max_rounds, timeout, stop, fds,
         if previous:
             prompt += render_prompt(PROMPT.with_name('PREVIOUS_ROUND.md'), PREVIOUS=previous)
         (current / 'prompt.md').write_text(prompt, encoding='utf-8')
-        state.update(latest_round=str(current), status='running')
+        state.update(latest_round=str(current), status='running', phase='repairing',
+                     phase_started_at=time.time())
         write_json(task / 'state.json', state)
 
         try:
@@ -296,6 +336,9 @@ def _round_loop(directory, harness, task, state, max_rounds, timeout, stop, fds,
             write_json(current / 'execution.json', execution)
 
         # Even CLI errors can leave real edits; verify them after all writers exit.
+        state.update(phase='checking', phase_started_at=time.time(),
+                     latest_verification=str(current / 'verification.json'))
+        write_json(task / 'state.json', state)
         verification = _check_harness(directory, harness, task, current, stop, timeout, fds, bootstrap)
         state['latest_verification'] = str(current / 'verification.json')
         write_json(task / 'state.json', state)
@@ -304,7 +347,14 @@ def _round_loop(directory, harness, task, state, max_rounds, timeout, stop, fds,
             return
         if _conclude(state, verification, rounds, min_rounds):
             return
-        healthy = succeeded(execution) and execution['result']['bytes'] > 0
+        # 超时但 harness Java 源码有实质变化视为进展（实测：两轮超时把 harness 从
+        # 24KB 写到 63KB，被旧规则误判为连续失败）；只有无产出的失败才计入熔断。
+        # HARNESS.md 指南每轮都会更新，不算实质产出。
+        try:
+            progressed = _java_sources(source_files(harness)) != _java_sources(files_at_round_start)
+        except (OSError, ValueError):
+            progressed = files_at_round_start is not None
+        healthy = (succeeded(execution) and execution['result']['bytes'] > 0) or progressed
         failures = 0 if healthy else failures + 1
         if failures >= 2:
             state.update(status='error', stopped_reason='Two consecutive CLI failures/missing final replies; fix environment and resume')
@@ -372,6 +422,7 @@ def start(target, *, description=None, workspace=None, inputs=(), materials=(), 
         ensure_guide(harness, target.name)  # 任务与协议由 task.md 承载，说明只留通用约定。
         shutil.copyfile(WORKFLOWS / 'pom.xml', harness / 'pom.xml')
         # There is deliberately no Java source, target ABI, JNI stub or RVA here.
+        # ProbeJni 探针类放在 workflow 目录，agent 调查时按需复制进工程（保持空工程启动）。
         normalized_rows = []
         for row in rows:
             request = dict(row['request'])
@@ -415,7 +466,7 @@ def resume(directory, task, *, max_rounds=None, timeout=600, cancelled=lambda: F
                       max_rounds=max_rounds, timeout=timeout, cancelled=cancelled)
 
 
-def continue_analysis(directory, *, description=None, materials=(), max_rounds=None, timeout=600):
+def continue_analysis(directory, *, description=None, materials=(), max_rounds=None, timeout=600, retry=False):
     """Reuse the associated workflow task, including a bootstrap interrupted before task creation."""
     directory = Path(directory)
     association_file = directory / 'harness.json'
@@ -431,7 +482,7 @@ def continue_analysis(directory, *, description=None, materials=(), max_rounds=N
                 tasks.append((path.parent, state))
         if tasks:
             task, state = max(tasks, key=lambda item: item[1]['created_at'])
-            if state['status'] in ('complete', 'observed', 'cancelled'):
+            if state['status'] in ('complete', 'observed', 'cancelled') and not retry:
                 return state
             return resume(directory, task, max_rounds=max_rounds, timeout=timeout)
         if config.get('workflow') == str(WORKFLOW):

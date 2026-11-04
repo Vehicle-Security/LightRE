@@ -38,7 +38,22 @@ def create_app(reader, *, start_worker=True, status=None):
 
     @app.get('/api/status')
     def analysis_status():
-        return status() if status else {'ready': True, 'status': 'ready', 'phase': 'ready'}
+        from rehost.progress import workflow_status
+        return status() if status else {'ready': True, 'status': 'ready', 'phase': 'ready',
+                                       'workflow': workflow_status(reader.directory)}
+
+    @app.get('/api/rehost')
+    def rehost_progress():
+        from rehost.progress import progress
+        return progress(reader.directory)
+
+    @app.post('/api/rehost/retry', status_code=202)
+    def retry_rehost():
+        from lightre.main_workflow import retry_rehost
+        try:
+            return retry_rehost(reader)
+        except (RuntimeError, ValueError, OSError) as error:
+            raise HTTPException(409, str(error)) from error
 
     @app.get("/api/functions")
     def functions():

@@ -82,27 +82,28 @@ round-0002/
 
 ### ✅ 已实现
 
-**rehost/loop.py** - 单 Agent 修复循环：
+**rehost/workflow.py** - 单 Agent 修复循环（`run_rounds` / `_round_loop`，V0.3.5 已并入 workflow.py）：
 
 ```python
-def repair(directory, max_rounds=3):
-    for round in range(1, max_rounds + 1):
-        # 1. 验证
-        verification = _verify(...)
-        if verification['passed']:
-            return "complete"
-        
+def run_rounds(directory, *, task=None, description=None, max_rounds=3, ...):
+    # 创建或恢复任务后进入轮次循环
+    while rounds < max_rounds:
+        # 1. 验证（终态判定：passed / observed[缺口清零] / error）
+        verification = _check_harness(...)
+        if _conclude(state, verification, rounds, min_rounds):
+            return state
+
         # 2. 单 Agent 自主工作
         result = run_blocking(
-            root=agents_root,
+            root=directory / 'agents',
             directory=round_dir,
             cwd=harness,
-            prompt=compose_prompt(...),
+            prompt=compose_prompt(...),   # 含知识库概览与上轮记录
             timeout=1800
         )
-        
-        # 3. 验证结果
-        verification = _verify(...)
+
+        # 3. 验证结果（超时但 Java 源码有实质变化视为进展）
+        verification = _check_harness(...)
 ```
 
 **特点**：

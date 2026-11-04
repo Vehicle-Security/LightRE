@@ -97,6 +97,21 @@ print('{"type":"turn.completed"}')
         self.assertEqual(continued['id'], state['id'])
         self.assertEqual(continued['status'], 'observed', continued)
 
+    def test_explicit_retry_rechecks_observed_task_without_replacing_harness(self):
+        first = self.start()
+        self.assertEqual(first['status'], 'observed', first)
+        config = read_json(self.directory / 'harness.json')
+        before = len(list((self.directory / 'runs').iterdir()))
+        repeated = continue_analysis(self.directory, retry=True, max_rounds=1)
+        self.assertEqual(repeated['id'], first['id'])
+        self.assertEqual(repeated['status'], 'observed', repeated)
+        self.assertEqual(read_json(self.directory / 'harness.json'), config)
+        self.assertGreater(len(list((self.directory / 'runs').iterdir())), before)
+        phases = []
+        result = run(self.directory, on_progress=lambda report: phases.append(report['phase']))
+        self.assertEqual(phases, ['preparing', 'checking_environment', 'building', 'executing', 'validating', 'finished'])
+        self.assertEqual(result['status'], 'observed')
+
     def test_empty_project_generation_environment_feedback_and_observation_replay(self):
         state = self.start()
         self.assertEqual(state['status'], 'observed', state)

@@ -56,9 +56,8 @@ class PendingWorkspace:
             except OSError as error:
                 result['log_tail'] = f'日志暂不可读：{error}'
         if self.reader is not None:
-            path = self.reader.directory / 'main-workflow.json'
-            if path.is_file():
-                result['workflow'] = json.loads(path.read_text(encoding='utf-8'))
+            from rehost.progress import workflow_status
+            result['workflow'] = workflow_status(self.reader.directory)
         return result
 
     def __getattr__(self, name):

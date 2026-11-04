@@ -63,9 +63,13 @@ def normalize_request(request, base=None):
         data = path.read_bytes()
         origin = {'path': str(path), 'sha256': digest(path)}
         request['input_file'] = 'input.bin'
+        # 期望哈希随请求物化：harness 可校验 input.bin 完整性并如实上报，
+        # 不需要在 Java 里硬编码任何"已知文件名→哈希"白名单。
+        request['input_sha256'] = origin['sha256']
     elif 'input_hex' in request:
         data = bytes.fromhex(request.pop('input_hex'))
         request['input_file'] = 'input.bin'
+        request['input_sha256'] = hashlib.sha256(data).hexdigest()
     else:
         data = b''
     return request, data, origin
@@ -73,9 +77,10 @@ def normalize_request(request, base=None):
 
 def expected(request, data, rows):
     sha = hashlib.sha256(data).hexdigest()
-    parameters = {k: v for k, v in request.items() if k != 'input_file'}
+    derived = ('input_file', 'input_sha256')  # normalize 物化的派生字段不参与比对。
+    parameters = {k: v for k, v in request.items() if k not in derived}
     for row in rows:
-        saved = {k: v for k, v in row['request'].items() if k not in ('input_file', 'input_hex')}
+        saved = {k: v for k, v in row['request'].items() if k not in derived + ('input_hex',)}
         # Exact types matter: bool is not an integer observation/parameter.
         if type_equal(parameters, saved) and row.get('input_sha256') == sha:
             return row.get('expected')
@@ -171,10 +176,13 @@ class Contract:
         normalized, data, origin = normalizer(request, base)
         if self.observing:
             # Inputs stay fixed even when no independent oracle is available.
+            # input_sha256 是 normalize 物化的派生字段（与 input_file 同类），
+            # 不参与与用例原始请求的参数比对。
             sha = hashlib.sha256(data).hexdigest()
-            parameters = {k: v for k, v in normalized.items() if k != 'input_file'}
+            derived = ('input_file', 'input_sha256')
+            parameters = {k: v for k, v in normalized.items() if k not in derived}
             if not any(row.get('input_sha256') == sha and type_equal(parameters, {
-                    k: v for k, v in row['request'].items() if k not in ('input_file', 'input_hex')
+                    k: v for k, v in row['request'].items() if k not in derived + ('input_hex',)
             }) for row in self.rows):
                 raise ValueError('Observation input differs from the fixed task seeds')
             wanted = {}

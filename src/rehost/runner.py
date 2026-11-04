@@ -55,7 +55,7 @@ def target_info(directory):
 
 
 def run(directory, request=None, *, request_base=None, replay=None, timeout=120,
-        cancelled=lambda: False, _lock_fds=None, _update_guide=True):
+        cancelled=lambda: False, _lock_fds=None, _update_guide=True, on_progress=None):
     """Every attempt has an independent record, including preflight failures."""
     directory = Path(directory).resolve()
     if directory.is_relative_to(PROJECT_DIR):
@@ -63,18 +63,23 @@ def run(directory, request=None, *, request_base=None, replay=None, timeout=120,
     root = directory / 'runs' / identifier()
     root.mkdir(parents=True)
     report = {'run': str(root), 'status': 'running', 'passed': False, 'started_at': time.time()}
-    write_json(root / 'verification.json', report)
+    def publish(phase):
+        report.update(phase=phase, phase_started_at=time.time())
+        write_json(root / 'verification.json', report)
+        if on_progress:
+            on_progress(report)
+    publish('preparing')
     try:
         harness, parameters = association(directory)
         if _lock_fds is None:
             with exclusive(directory, harness) as fds:
                 _run(directory, harness, parameters, root, request, request_base, replay,
-                     timeout, cancelled, fds, report)
+                     timeout, cancelled, fds, report, publish)
                 if replay is None and _update_guide:
                     record_check(harness, report, root / 'verification.json')
         else:
             _run(directory, harness, parameters, root, request, request_base, replay,
-                 timeout, cancelled, _lock_fds, report)
+                 timeout, cancelled, _lock_fds, report, publish)
     except Exception as error:  # Checker/import failures must also leave a failed Run.
         report.update(status='error', passed=False, error=str(error))
     except BaseException:
@@ -82,12 +87,12 @@ def run(directory, request=None, *, request_base=None, replay=None, timeout=120,
         raise
     finally:
         report['finished_at'] = time.time()
-        write_json(root / 'verification.json', report)
+        publish('finished')
     return report
 
 
 def _run(directory, harness, parameters, root, request, request_base, replay,
-         timeout, cancelled, fds, report):
+         timeout, cancelled, fds, report, publish):
     binary = target_info(directory)
     source = root / 'harness'
     manifest = {'binary': binary, 'parameters': parameters, 'replay_of': None, 'contract_version': 1}
@@ -158,12 +163,14 @@ def _run(directory, harness, parameters, root, request, request_base, replay,
     manifest['expected_sha256'] = digest(root / 'expected.json')
     write_json(root / 'manifest.json', manifest)
     report['expected'] = wanted
+    publish('checking_environment')
     for tool in ('java', 'mvn'):
         record = execute([tool, '-version'], source, root / f'versions/{tool}', timeout=10,
                          cancelled=cancelled, pass_fds=fds)
         if not succeeded(record):
             report.update(status=record['status'], error=f'{tool} unavailable; see versions/{tool}')
             return
+    publish('building')
     build = execute(['mvn', '-B', '-ntp', 'compile', 'dependency:build-classpath',
                      '-Dmdep.outputFile=classpath.txt'], source, root / 'build', timeout=timeout,
                     cancelled=cancelled, pass_fds=fds)
@@ -182,6 +189,7 @@ def _run(directory, harness, parameters, root, request, request_base, replay,
                os.pathsep.join([str(source / 'target/classes'), *(str(path) for path in jars)]),
                parameters['main_class'], binary['path'],
                str(root / 'request.json'), str(root / 'observation.json')]
+    publish('executing')
     execution = execute(command, source, root / 'execute', timeout=timeout,
                         cancelled=cancelled, pass_fds=fds)
     report['execution'] = execution
@@ -189,6 +197,7 @@ def _run(directory, harness, parameters, root, request, request_base, replay,
         report.update(status='cancelled' if execution['status'] == 'cancelled' else 'execution_failed',
                       error=f'Harness execution failed; see {root / "execute"}')
         return
+    publish('validating')
     try:
         observation = read_json(root / 'observation.json')
     except (OSError, ValueError) as error:
@@ -220,6 +229,19 @@ def _run(directory, harness, parameters, root, request, request_base, replay,
             or (current_baseline is not None and baseline_files(directory) != current_baseline)
             or any(digest(item['path']) != item['sha256'] for item in dependencies)):
         differences.append('Request, input or runtime dependencies changed during execution')
+    # 探索运行与缺口清单参与终态判定（V0.3.5）：probe 运行只是调查，
+    # 缺口未清零的运行不能宣称 observed/passed，循环必须继续补环境。
+    # 区分两类缺口：missing_environment（OS 环境缺口，必须清零）与
+    # assumed_environment（应用侧替身，无 APK 时不可能为真，允许保留但
+    # 逐条记录依据；实测 DG 的 DroidGuard.g 等 Java 业务回调属此类）。
+    if observation.get('mode'):
+        differences.append(f'Exploration run (mode={observation["mode"]}) is investigation only; '
+                           'it cannot count as observed/passed')
+    gaps = observation.get('missing_environment')
+    if isinstance(gaps, list) and gaps:
+        differences.append(f'Environment incomplete: {len(gaps)} entries in missing_environment')
+    assumptions = observation.get('assumed_environment')
+    report['assumed_environment'] = assumptions if isinstance(assumptions, list) else []
     observed = contract.observing and not differences
     report.update(observation=observation, differences=differences,
                   status='mismatch' if differences else ('observed' if observed else 'passed'),

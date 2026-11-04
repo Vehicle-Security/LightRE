@@ -18,7 +18,7 @@ Rehost 的经验分三层，各层职责与生命周期不同：
 
 - 模块：`src/rehost/knowledge.py`；种子模板：`src/rehost/knowledge/*.md`
   （`INDEX.md` 使用说明与条目格式、`UNIDBG.md`、`SO_PATTERNS.md`）。
-- 播种：`repair()` 进入写锁后调用 `knowledge_directory()`，缺省文件从模板创建，
+- 播种：`run_rounds()` 进入写锁后调用 `knowledge_directory()`，缺省文件从模板创建，
   已有条目永不覆盖。
 - 注入：每轮 prompt（`ROUND.md` 的 `{{KNOWLEDGE}}`）只携带根路径与文件清单，
   agent 按需读取，不整库载入。

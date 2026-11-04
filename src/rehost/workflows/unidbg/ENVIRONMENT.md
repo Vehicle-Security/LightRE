@@ -18,3 +18,17 @@
 每次补丁更新 HARNESS.md：缺口 → 证据 → 实现或假设 → 真实重跑结果。
 补环境只服务于原实现的自然入口运行。强改 PC/VPC、分支、ready 标志或返回值属于干预实验，
 需要另行明确授权与记录，不作为本 workflow 的自然运行通过依据。
+
+## 探针补环境（ProbeJni）
+
+探针类位于 workflow 目录 `src/lightre/support/ProbeJni.java`（通用、零目标知识），
+需要时复制进 harness 工程。双模式：
+
+- **probe**：AbstractJni 未实现的调用按返回类型兜底（数值 0/布尔 false/字符串 ""），
+  每次兜底记录缺口（family 分类：system-service / field / callback / other）。
+  只用于调查：observation 必须标 `"mode":"probe"`，外层不会把探针运行算作通过。
+- **strict**（自然运行默认）：未实现直接抛出，如实失败。
+
+工作方式：先以 probe 模式运行拿全当前层缺口 → 按族补真实实现（注明来源或假设）
+→ strict 模式自然运行验证。探针兜底值必须逐个替换为真实实现后才能宣称完成；
+缺口分层暴露是正常的，每轮专注一个层级。
